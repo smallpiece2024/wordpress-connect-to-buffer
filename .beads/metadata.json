@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "wordpress_connect_to_buffer",
+  "project_id": "f3d03fa3-c819-4eb8-8715-b7a2c4ee21df"
+}
