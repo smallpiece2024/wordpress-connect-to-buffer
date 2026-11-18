@@ -61,6 +61,25 @@ class WCTB_Options {
 	}
 
 	/**
+	 * チャンネルの一覧を返す。1 時間キャッシュする。
+	 *
+	 * @return array[]|WP_Error id、name、service を持つ配列のリスト。
+	 */
+	public static function channels() {
+		$cached = get_transient( self::CHANNEL_TRANSIENT );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
+		$channels = ( new WCTB_Api( self::api_key() ) )->get_channels();
+		if ( ! is_wp_error( $channels ) ) {
+			set_transient( self::CHANNEL_TRANSIENT, $channels, HOUR_IN_SECONDS );
+		}
+
+		return $channels;
+	}
+
+	/**
 	 * 送信結果を 1 件記録する。新しいものから LOG_LIMIT 件だけ残す。
 	 *
 	 * @param int    $post_id 投稿 ID。

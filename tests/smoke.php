@@ -36,7 +36,7 @@ add_filter(
 		} elseif ( false !== strpos( $body['query'], 'channels(' ) ) {
 			$data = array(
 				'channels' => array(
-					array( 'id' => 'ch1', 'name' => 'x', 'displayName' => 'X account', 'service' => 'twitter' ),
+					array( 'id' => 'ch1', 'name' => 'x', 'displayName' => 'X account', 'service' => 'instagram' ),
 					array( 'id' => 'ch2', 'name' => 'fb', 'displayName' => '', 'service' => 'facebook' ),
 				),
 			);
@@ -65,7 +65,10 @@ add_filter(
 	3
 );
 
-// 準備。
+// 準備。保存済みの設定とログは退避し、最後に戻す。
+$wctb_saved_settings = get_option( WCTB_Options::OPTION );
+$wctb_saved_log      = get_option( WCTB_Options::LOG_OPTION );
+
 delete_option( WCTB_Options::OPTION );
 delete_option( WCTB_Options::LOG_OPTION );
 delete_transient( WCTB_Options::CHANNEL_TRANSIENT );
@@ -114,6 +117,16 @@ $wctb_check( 'Bearer 形式でキーを送る', 'Bearer secret-key' === $wctb_ca
 $wctb_check( '本文がタイトルと URL になる', "Smoke & test\n" . get_permalink( $wctb_post ) === $wctb_calls[0]['input']['text'] );
 $wctb_check( 'キューに追加する指定になっている', 'addToQueue' === $wctb_calls[0]['input']['mode'] && 'automatic' === $wctb_calls[0]['input']['schedulingType'] );
 $wctb_check( 'HTTPS でない画像は付けない', array() === $wctb_calls[0]['input']['assets'] );
+$wctb_check(
+	'Instagram には投稿の種類とフィードへの共有を指定する',
+	array(
+		'instagram' => array(
+			'type'              => 'post',
+			'shouldShareToFeed' => true,
+		),
+	) === ( $wctb_calls[0]['input']['metadata'] ?? null )
+);
+$wctb_check( 'Facebook には投稿の種類を指定する', array( 'facebook' => array( 'type' => 'post' ) ) === ( $wctb_calls[1]['input']['metadata'] ?? null ) );
 $wctb_check( '成功したチャンネルだけを送信済みにする', array( 'ch1' => 'bp-1' ) === get_post_meta( $wctb_post, WCTB_Options::SENT_META, true ) );
 
 $wctb_log = WCTB_Options::get_log();
@@ -160,6 +173,13 @@ wp_publish_post( $wctb_future );
 $wctb_check( '予約投稿が公開されたら送る', 2 === count( $wctb_calls ) );
 $wctb_check( '画像の URL を assets に入れる', array( array( 'image' => array( 'url' => 'https://example.com/image.jpg' ) ) ) === ( $wctb_calls[0]['input']['assets'] ?? null ) );
 
+// サービスが分からないチャンネル。
+$wctb_calls = array();
+set_transient( WCTB_Options::CHANNEL_TRANSIENT, array( array( 'id' => 'ch1', 'name' => 'x', 'service' => 'twitter' ) ), HOUR_IN_SECONDS );
+$wctb_plain = wp_insert_post( array( 'post_title' => 'Plain', 'post_status' => 'publish', 'post_type' => 'post', 'tags_input' => array( 'wctb-smoke' ) ) );
+$wctb_check( 'Facebook と Instagram 以外には種類の指定を付けない', 2 === count( $wctb_calls ) && ! isset( $wctb_calls[0]['input']['metadata'] ) && ! isset( $wctb_calls[1]['input']['metadata'] ) );
+wp_delete_post( $wctb_plain, true );
+
 // タグ未指定なら全投稿。
 $wctb_calls            = array();
 $wctb_settings['tags'] = array();
@@ -175,6 +195,13 @@ wp_delete_term( $wctb_tag, 'post_tag' );
 delete_option( WCTB_Options::OPTION );
 delete_option( WCTB_Options::LOG_OPTION );
 delete_transient( WCTB_Options::CHANNEL_TRANSIENT );
+
+if ( false !== $wctb_saved_settings ) {
+	update_option( WCTB_Options::OPTION, $wctb_saved_settings );
+}
+if ( false !== $wctb_saved_log ) {
+	update_option( WCTB_Options::LOG_OPTION, $wctb_saved_log, false );
+}
 
 if ( $wctb_failed ) {
 	WP_CLI::error( $wctb_failed . ' 件の確認に失敗した。' );

@@ -152,25 +152,6 @@ class WCTB_Settings {
 	}
 
 	/**
-	 * チャンネルの一覧を返す。1 時間キャッシュする。
-	 *
-	 * @return array[]|WP_Error
-	 */
-	private function channels() {
-		$cached = get_transient( WCTB_Options::CHANNEL_TRANSIENT );
-		if ( is_array( $cached ) ) {
-			return $cached;
-		}
-
-		$channels = ( new WCTB_Api( WCTB_Options::api_key() ) )->get_channels();
-		if ( ! is_wp_error( $channels ) ) {
-			set_transient( WCTB_Options::CHANNEL_TRANSIENT, $channels, HOUR_IN_SECONDS );
-		}
-
-		return $channels;
-	}
-
-	/**
 	 * 設定画面を出力する。
 	 */
 	public function render() {
@@ -184,7 +165,7 @@ class WCTB_Settings {
 
 		$settings = WCTB_Options::get();
 		$has_key  = '' !== WCTB_Options::api_key();
-		$channels = $has_key ? $this->channels() : array();
+		$channels = $has_key ? WCTB_Options::channels() : array();
 		$name     = WCTB_Options::OPTION;
 
 		$tag_names = array();

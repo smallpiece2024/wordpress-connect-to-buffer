@@ -61,6 +61,7 @@ Buffer は画像を URL から取得する。そのため、アイキャッチ�
 | `wctb_should_send` | 投稿ごとに送るかどうかを変える |
 | `wctb_post_text` | Buffer に送る本文を変える |
 | `wctb_post_image_url` | Buffer に送る画像の URL を変える。空文字なら画像を付けない |
+| `wctb_post_metadata` | サービス固有の指定を変える。Facebook と Instagram には、通常の投稿（`type: post`）として送る指定を付けている |
 
 ## 開発
 
@@ -72,7 +73,7 @@ npx @wordpress/env start
 
 http://localhost:8888/wp-admin/ を開き、ユーザー名 `admin`、パスワード `password` でログインする。
 
-動作確認のスクリプトは次のコマンドで実行する。Buffer への通信は模擬するので、実際の投稿は作られない。
+動作確認のスクリプトは次のコマンドで実行する。Buffer への通信は模擬するので、実際の投稿は作られない。保存済みの設定と送信ログは、実行後に元へ戻る。
 
 ```
 npx @wordpress/env run cli wp eval-file wp-content/plugins/wordpress-connect-to-buffer/tests/smoke.php

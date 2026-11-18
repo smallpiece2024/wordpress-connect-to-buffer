@@ -140,9 +140,10 @@ class WCTB_Api {
 	 * @param string $channel_id チャンネル ID。
 	 * @param string $text       本文。
 	 * @param string $image_url  画像の URL。空なら画像なし。
+	 * @param array  $metadata   サービス固有の指定（PostInputMetaData）。空なら付けない。
 	 * @return string|WP_Error Buffer の投稿 ID。
 	 */
-	public function create_post( $channel_id, $text, $image_url = '' ) {
+	public function create_post( $channel_id, $text, $image_url = '', array $metadata = array() ) {
 		$query = 'mutation CreatePost($input: CreatePostInput!) {
 			createPost(input: $input) {
 				__typename
@@ -161,6 +162,10 @@ class WCTB_Api {
 
 		if ( '' !== $image_url ) {
 			$input['assets'][] = array( 'image' => array( 'url' => (string) $image_url ) );
+		}
+
+		if ( $metadata ) {
+			$input['metadata'] = $metadata;
 		}
 
 		$data = $this->request( $query, array( 'input' => $input ) );

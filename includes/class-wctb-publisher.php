@@ -73,13 +73,19 @@ class WCTB_Publisher {
 		$text      = $this->build_text( $post );
 		$image_url = $this->image_url( $post );
 		$api       = new WCTB_Api( $api_key );
+		$services  = null;
 
 		foreach ( $settings['channels'] as $channel_id ) {
 			if ( isset( $sent[ $channel_id ] ) ) {
 				continue;
 			}
 
-			$result = $api->create_post( $channel_id, $text, $image_url );
+			if ( null === $services ) {
+				$services = $this->services();
+			}
+
+			$metadata = $this->metadata( $services[ $channel_id ] ?? '', $channel_id, $post );
+			$result   = $api->create_post( $channel_id, $text, $image_url, $metadata );
 
 			if ( is_wp_error( $result ) ) {
 				WCTB_Options::add_log( $post_id, $channel_id, false, $result->get_error_message() );
@@ -91,6 +97,57 @@ class WCTB_Publisher {
 		}
 
 		update_post_meta( $post_id, WCTB_Options::SENT_META, $sent );
+	}
+
+	/**
+	 * チャンネル ID からサービス名（facebook、instagram など）を引く表を返す。
+	 *
+	 * 一覧を取得できなければ空の表を返し、サービス固有の指定なしで送る。
+	 *
+	 * @return array<string,string>
+	 */
+	private function services() {
+		$channels = WCTB_Options::channels();
+		$services = array();
+
+		if ( is_array( $channels ) ) {
+			foreach ( $channels as $channel ) {
+				$services[ $channel['id'] ] = $channel['service'];
+			}
+		}
+
+		return $services;
+	}
+
+	/**
+	 * サービスごとに必須の指定を作る。Facebook と Instagram は投稿の種類を求める。
+	 *
+	 * @param string  $service    サービス名。
+	 * @param string  $channel_id チャンネル ID。
+	 * @param WP_Post $post       投稿。
+	 * @return array
+	 */
+	private function metadata( $service, $channel_id, WP_Post $post ) {
+		$metadata = array();
+
+		if ( 'facebook' === $service ) {
+			$metadata['facebook'] = array( 'type' => 'post' );
+		} elseif ( 'instagram' === $service ) {
+			$metadata['instagram'] = array(
+				'type'              => 'post',
+				'shouldShareToFeed' => true,
+			);
+		}
+
+		/**
+		 * Buffer に送るサービス固有の指定（PostInputMetaData）。
+		 *
+		 * @param array   $metadata   指定。
+		 * @param string  $service    サービス名。
+		 * @param string  $channel_id チャンネル ID。
+		 * @param WP_Post $post       投稿。
+		 */
+		return (array) apply_filters( 'wctb_post_metadata', $metadata, $service, $channel_id, $post );
 	}
 
 	/**
