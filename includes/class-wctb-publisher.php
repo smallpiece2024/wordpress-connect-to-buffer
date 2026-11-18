@@ -85,15 +85,15 @@ class WCTB_Publisher {
 			}
 
 			$metadata = $this->metadata( $services[ $channel_id ] ?? '', $channel_id, $post );
-			$result   = $api->create_post( $channel_id, $text, $image_url, $metadata );
+			$result   = $api->create_post( $channel_id, $text, $image_url, $metadata, $settings['draft'] );
 
 			if ( is_wp_error( $result ) ) {
-				WCTB_Options::add_log( $post_id, $channel_id, false, $result->get_error_message() );
+				WCTB_Options::add_log( $post_id, $channel_id, false, $result->get_error_message(), $settings['draft'] );
 				continue;
 			}
 
 			$sent[ $channel_id ] = $result;
-			WCTB_Options::add_log( $post_id, $channel_id, true, $result );
+			WCTB_Options::add_log( $post_id, $channel_id, true, $result, $settings['draft'] );
 		}
 
 		update_post_meta( $post_id, WCTB_Options::SENT_META, $sent );

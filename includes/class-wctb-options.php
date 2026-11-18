@@ -23,7 +23,7 @@ class WCTB_Options {
 	/**
 	 * 保存済みの設定を、既定値で補って返す。
 	 *
-	 * @return array{api_key:string,channels:string[],tags:int[]}
+	 * @return array{api_key:string,channels:string[],tags:int[],draft:bool}
 	 */
 	public static function get() {
 		$saved = get_option( self::OPTION, array() );
@@ -33,6 +33,8 @@ class WCTB_Options {
 			'api_key'  => isset( $saved['api_key'] ) ? (string) $saved['api_key'] : '',
 			'channels' => isset( $saved['channels'] ) ? array_values( array_map( 'strval', (array) $saved['channels'] ) ) : array(),
 			'tags'     => isset( $saved['tags'] ) ? array_values( array_map( 'intval', (array) $saved['tags'] ) ) : array(),
+			// 既定は下書き。確認なしに SNS へ公開されないようにする。
+			'draft'    => isset( $saved['draft'] ) ? (bool) $saved['draft'] : true,
 		);
 	}
 
@@ -86,8 +88,9 @@ class WCTB_Options {
 	 * @param string $channel チャンネル ID。
 	 * @param bool   $success 成功したか。
 	 * @param string $message Buffer の投稿 ID、またはエラーの内容。
+	 * @param bool   $draft   下書きとして送ったか。
 	 */
-	public static function add_log( $post_id, $channel, $success, $message ) {
+	public static function add_log( $post_id, $channel, $success, $message, $draft = false ) {
 		$log = get_option( self::LOG_OPTION, array() );
 		$log = is_array( $log ) ? $log : array();
 
@@ -99,6 +102,7 @@ class WCTB_Options {
 				'channel' => (string) $channel,
 				'success' => (bool) $success,
 				'message' => (string) $message,
+				'draft'   => (bool) $draft,
 			)
 		);
 

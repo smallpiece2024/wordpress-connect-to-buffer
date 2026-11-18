@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Connect to Buffer
  * Plugin URI:        https://github.com/smallpiece2024/wordpress-connect-to-buffer
- * Description:       Adds a post to your Buffer queue with its title, URL and featured image when it is published.
+ * Description:       Sends a post to Buffer with its title, URL and featured image when it is published, as a draft or straight into your queue.
  * Version:           0.1.0
  * Requires at least: 5.6
  * Requires PHP:      7.4

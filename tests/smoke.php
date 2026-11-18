@@ -116,6 +116,8 @@ $wctb_check( '公開時に 2 つのチャンネルへ送る', 2 === count( $wctb
 $wctb_check( 'Bearer 形式でキーを送る', 'Bearer secret-key' === $wctb_calls[0]['auth'] );
 $wctb_check( '本文がタイトルと URL になる', "Smoke & test\n" . get_permalink( $wctb_post ) === $wctb_calls[0]['input']['text'] );
 $wctb_check( 'キューに追加する指定になっている', 'addToQueue' === $wctb_calls[0]['input']['mode'] && 'automatic' === $wctb_calls[0]['input']['schedulingType'] );
+$wctb_check( '送り方を選ばなければ下書きとして送る', true === $wctb_settings['draft'] && true === ( $wctb_calls[0]['input']['saveToDraft'] ?? null ) );
+$wctb_check( '下書きとして送ったことがログに残る', true === ( WCTB_Options::get_log()[1]['draft'] ?? null ) );
 $wctb_check( 'HTTPS でない画像は付けない', array() === $wctb_calls[0]['input']['assets'] );
 $wctb_check(
 	'Instagram には投稿の種類とフィードへの共有を指定する',
@@ -181,11 +183,12 @@ $wctb_check( 'Facebook と Instagram 以外には種類の指定を付けない'
 wp_delete_post( $wctb_plain, true );
 
 // タグ未指定なら全投稿。
-$wctb_calls            = array();
-$wctb_settings['tags'] = array();
+$wctb_calls    = array();
+$wctb_settings = ( new WCTB_Settings() )->sanitize( array( 'form' => '1', 'tags_input' => '', 'delivery' => 'queue' ) );
 update_option( WCTB_Options::OPTION, $wctb_settings );
 $wctb_all = wp_insert_post( array( 'post_title' => 'All', 'post_status' => 'publish', 'post_type' => 'post' ) );
 $wctb_check( 'タグ未指定ならタグのない投稿も送る', 2 === count( $wctb_calls ) );
+$wctb_check( '「キューに追加」を選ぶと下書きにしない', false === $wctb_settings['draft'] && ! isset( $wctb_calls[0]['input']['saveToDraft'] ) );
 
 // 後始末。
 foreach ( array( $wctb_post, $wctb_no_tag, $wctb_page, $wctb_future, $wctb_all ) as $wctb_id ) {

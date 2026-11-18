@@ -84,10 +84,14 @@ class WCTB_Settings {
 				'api_key'  => isset( $input['api_key'] ) ? sanitize_text_field( $input['api_key'] ) : '',
 				'channels' => isset( $input['channels'] ) ? array_values( array_map( 'sanitize_text_field', (array) $input['channels'] ) ) : array(),
 				'tags'     => isset( $input['tags'] ) ? array_values( array_filter( array_map( 'absint', (array) $input['tags'] ) ) ) : array(),
+				'draft'    => isset( $input['draft'] ) ? (bool) $input['draft'] : true,
 			);
 		}
 
 		$new = WCTB_Options::get();
+
+		// 送り方。「キューに追加」を選んだときだけ、下書きにしない。
+		$new['draft'] = ! ( isset( $input['delivery'] ) && 'queue' === $input['delivery'] );
 
 		// API キー。空欄なら保存済みのキーを保つ。
 		if ( ! WCTB_Options::has_key_constant() ) {
@@ -256,6 +260,25 @@ class WCTB_Settings {
 					</tr>
 
 					<tr>
+						<th scope="row"><?php esc_html_e( 'When a post is published', 'wordpress-connect-to-buffer' ); ?></th>
+						<td>
+							<fieldset>
+								<label>
+									<input type="radio" name="<?php echo esc_attr( $name ); ?>[delivery]" value="draft" <?php checked( $settings['draft'] ); ?> />
+									<?php esc_html_e( 'Save it as a draft in Buffer', 'wordpress-connect-to-buffer' ); ?>
+								</label><br />
+								<label>
+									<input type="radio" name="<?php echo esc_attr( $name ); ?>[delivery]" value="queue" <?php checked( ! $settings['draft'] ); ?> />
+									<?php esc_html_e( 'Add it to the queue', 'wordpress-connect-to-buffer' ); ?>
+								</label>
+							</fieldset>
+							<p class="description">
+								<?php esc_html_e( 'A draft is not published until you schedule it in Buffer. A queued post is published automatically at the next slot of your posting schedule.', 'wordpress-connect-to-buffer' ); ?>
+							</p>
+						</td>
+					</tr>
+
+					<tr>
 						<th scope="row">
 							<label for="wctb-tags"><?php esc_html_e( 'Tags', 'wordpress-connect-to-buffer' ); ?></label>
 						</th>
@@ -312,7 +335,9 @@ class WCTB_Settings {
 						<td><?php echo esc_html( $names[ $entry['channel'] ] ?? $entry['channel'] ); ?></td>
 						<td>
 							<?php
-							if ( $entry['success'] ) {
+							if ( $entry['success'] && ! empty( $entry['draft'] ) ) {
+								esc_html_e( 'Saved as draft', 'wordpress-connect-to-buffer' );
+							} elseif ( $entry['success'] ) {
 								esc_html_e( 'Added to queue', 'wordpress-connect-to-buffer' );
 							} else {
 								/* translators: %s: error message. */

@@ -16,8 +16,9 @@ Bufferへ投稿するプラグイン
 
 ## できること
 
-投稿を公開すると、タイトル、URL、アイキャッチ画像を Buffer のキューに追加する。
+投稿を公開すると、タイトル、URL、アイキャッチ画像を Buffer に送る。
 
+- Buffer の下書きとして保存するか、キューに追加するかを選べる。既定は下書き。下書きは、Buffer で予約するまで SNS に公開されない。キューに追加したものは、投稿スケジュールの次の枠で自動的に公開される。
 - 対象は通常の「投稿」だけ。固定ページとカスタム投稿タイプは送らない。
 - 送るのは、初めて公開したときの 1 回だけ。公開済みの投稿を更新しても送らない。予約投稿は、公開された時点で送る。
 - 投稿先のチャンネルは複数選べる。
@@ -34,7 +35,7 @@ Bufferへ投稿するプラグイン
 1. このリポジトリを `wp-content/plugins/wordpress-connect-to-buffer` に置き、プラグインを有効にする。
 2. Buffer の [API 設定](https://publish.buffer.com/settings/api) で API キーを作る。
 3. 「設定 > Connect to Buffer」を開き、API キーを保存する。
-4. 表示されたチャンネルから投稿先を選び、必要ならタグを指定して保存する。
+4. 表示されたチャンネルから投稿先を選び、送り方（下書きかキューか）と、必要ならタグを指定して保存する。
 
 送信の結果は、設定画面の「Recent activity」に直近 20 件が表示される。
 
@@ -84,7 +85,7 @@ npx @wordpress/env run cli wp eval-file wp-content/plugins/wordpress-connect-to-
 | サービス | 用途 | 設定の場所 |
 |---|---|---|
 | WordPress | プラグインを動かすサイト | プラグインを入れるサイトの管理画面で設定 |
-| Buffer | SNS への投稿の予約。GraphQL API でキューに追加する | 設定画面「設定 > Connect to Buffer」、または `wp-config.php` の定数 `WCTB_API_KEY` |
+| Buffer | SNS への投稿の予約。GraphQL API で下書きまたはキューに追加する | 設定画面「設定 > Connect to Buffer」、または `wp-config.php` の定数 `WCTB_API_KEY` |
 
 ## ライセンス
 

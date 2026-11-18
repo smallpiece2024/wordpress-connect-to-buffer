@@ -135,15 +135,16 @@ class WCTB_Api {
 	}
 
 	/**
-	 * 投稿をチャンネルのキューに追加する。
+	 * 投稿をチャンネルのキューに追加する。$draft が true なら下書きとして保存する。
 	 *
 	 * @param string $channel_id チャンネル ID。
 	 * @param string $text       本文。
 	 * @param string $image_url  画像の URL。空なら画像なし。
 	 * @param array  $metadata   サービス固有の指定（PostInputMetaData）。空なら付けない。
+	 * @param bool   $draft      true なら予約せず、Buffer の下書きとして保存する。
 	 * @return string|WP_Error Buffer の投稿 ID。
 	 */
-	public function create_post( $channel_id, $text, $image_url = '', array $metadata = array() ) {
+	public function create_post( $channel_id, $text, $image_url = '', array $metadata = array(), $draft = false ) {
 		$query = 'mutation CreatePost($input: CreatePostInput!) {
 			createPost(input: $input) {
 				__typename
@@ -166,6 +167,10 @@ class WCTB_Api {
 
 		if ( $metadata ) {
 			$input['metadata'] = $metadata;
+		}
+
+		if ( $draft ) {
+			$input['saveToDraft'] = true;
 		}
 
 		$data = $this->request( $query, array( 'input' => $input ) );
