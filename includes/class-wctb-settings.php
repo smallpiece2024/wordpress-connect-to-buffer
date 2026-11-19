@@ -273,7 +273,7 @@ class WCTB_Settings {
 									</tbody>
 								</table>
 								<p class="description">
-									<?php esc_html_e( 'With "Vertical image with the title", the featured image is cropped to 9:16 around its center and the post title is drawn on it. Channels without it receive the featured image as it is.', 'wordpress-connect-to-buffer' ); ?>
+									<?php esc_html_e( 'With "Vertical image with the title", the featured image is cropped to 9:16 around its center and the post title is drawn on it. Channels without it receive the featured image as it is. An Instagram channel with it receives the image as a story, which has no caption.', 'wordpress-connect-to-buffer' ); ?>
 								</p>
 								<?php if ( ! WCTB_Image::is_supported() ) : ?>
 									<p class="description">

@@ -100,7 +100,7 @@ class WCTB_Publisher {
 			 */
 			$image_url = (string) apply_filters( 'wctb_post_image_url', $images[ $kind ], $post, $channel_id );
 
-			$metadata = $this->metadata( $services[ $channel_id ] ?? '', $channel_id, $post );
+			$metadata = $this->metadata( $services[ $channel_id ] ?? '', $channel_id, $post, 'title' === $kind );
 			$result   = $api->create_post( $channel_id, $text, $image_url, $metadata, $settings['draft'] );
 
 			if ( is_wp_error( $result ) ) {
@@ -141,13 +141,17 @@ class WCTB_Publisher {
 	 * @param string  $service    サービス名。
 	 * @param string  $channel_id チャンネル ID。
 	 * @param WP_Post $post       投稿。
+	 * @param bool    $vertical   タイトル入りの縦長画像を送るチャンネルか。
 	 * @return array
 	 */
-	private function metadata( $service, $channel_id, WP_Post $post ) {
+	private function metadata( $service, $channel_id, WP_Post $post, $vertical = false ) {
 		$metadata = array();
 
 		if ( 'facebook' === $service ) {
 			$metadata['facebook'] = array( 'type' => 'post' );
+		} elseif ( 'instagram' === $service && $vertical ) {
+			// 9:16 の画像はフィード投稿の比率（4:5〜1.91:1）に収まらないので、ストーリーズとして送る。
+			$metadata['instagram'] = array( 'type' => 'story' );
 		} elseif ( 'instagram' === $service ) {
 			$metadata['instagram'] = array(
 				'type'              => 'post',

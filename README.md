@@ -63,6 +63,7 @@ Instagram のストーリーズなど、縦長の画像を使う投稿先のた�
 
 - アイキャッチ画像の中央を 9:16 に切り抜き、1080×1920 にする。元の画像の短いほうの辺をそのまま使う。横長の画像なら縦をすべて使って左右を切り、9:16 より縦長の画像なら横をすべて使って上下を切る。
 - 画像の中央に半透明の帯を敷き、投稿のタイトルを白い文字で描く。長いタイトルは折り返し、文字を小さくしても 6 行に収まらない分は「…」で切る。
+- この加工を有効にした Instagram のチャンネルには、ストーリーズ（`type: story`）として送る。9:16 の画像は、フィード投稿で使える比率（4:5〜1.91:1）に収まらないため。ストーリーズには本文（タイトルと URL）が付かない。
 - 文字は同梱の Noto Sans JP（Bold）で描くので、日本語のタイトルも描ける。
 - 生成した画像は `wp-content/uploads/wctb/` に保存する。投稿を完全に削除したときと、プラグインを削除したときに消す。
 - アイキャッチ画像がない、サーバーの PHP に GD 拡張（FreeType 対応）がないなどで生成できなければ、アイキャッチ画像をそのまま送る。
@@ -82,7 +83,7 @@ npx @wordpress/env run cli wp eval-file wp-content/plugins/wordpress-connect-to-
 | `wctb_post_image_url` | Buffer に送る画像の URL を変える。空文字なら画像を付けない。第 3 引数でチャンネル ID を受け取れる |
 | `wctb_title_image_text` | 縦長画像に描き込む文字を変える。空文字なら何も描かない |
 | `wctb_title_image_font` | 縦長画像の文字に使うフォントファイル（TrueType か OpenType）のパスを変える |
-| `wctb_post_metadata` | サービス固有の指定を変える。Facebook と Instagram には、通常の投稿（`type: post`）として送る指定を付けている |
+| `wctb_post_metadata` | サービス固有の指定を変える。Facebook と Instagram には、通常の投稿（`type: post`）として送る指定を付けている。縦長画像を有効にした Instagram のチャンネルは `type: story` になる |
 
 ## 開発
 

@@ -208,6 +208,7 @@ $wctb_title_path = trailingslashit( $wctb_uploads['basedir'] ) . WCTB_Image::DIR
 $wctb_title_size = is_file( $wctb_title_path ) ? getimagesize( $wctb_title_path ) : array( 0, 0 );
 
 $wctb_check( '指定したチャンネルにはタイトル入り画像の URL を送る', 1 === preg_match( '#^https://.+/wctb/post-' . $wctb_titled . '-[0-9a-f]{12}\.jpg$#', $wctb_title_url ) );
+$wctb_check( 'タイトル入り画像を送る Instagram にはストーリーズを指定する', array( 'instagram' => array( 'type' => 'story' ) ) === ( $wctb_calls[0]['input']['metadata'] ?? null ) );
 $wctb_check( 'タイトル入り画像は 1080×1920 になる', 1080 === $wctb_title_size[0] && 1920 === $wctb_title_size[1] );
 $wctb_check( '指定のないチャンネルにはアイキャッチ画像をそのまま送る', 'wctb-smoke-source.jpg' === basename( (string) ( $wctb_calls[1]['input']['assets'][0]['image']['url'] ?? '' ) ) );
 $wctb_check( '同じ画像とタイトルなら作り直さない', WCTB_Image::generate( get_post( $wctb_titled ) ) === $wctb_title_url );
