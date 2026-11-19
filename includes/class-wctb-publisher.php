@@ -70,10 +70,12 @@ class WCTB_Publisher {
 		$sent = get_post_meta( $post_id, WCTB_Options::SENT_META, true );
 		$sent = is_array( $sent ) ? $sent : array();
 
-		$text      = $this->build_text( $post );
-		$image_url = $this->image_url( $post );
-		$api       = new WCTB_Api( $api_key );
-		$services  = null;
+		$text     = $this->build_text( $post );
+		$api      = new WCTB_Api( $api_key );
+		$services = null;
+
+		// 画像の URL。そのままのもの（plain）とタイトル入りのもの（title）を、必要になったときに 1 回だけ作る。
+		$images = array();
 
 		foreach ( $settings['channels'] as $channel_id ) {
 			if ( isset( $sent[ $channel_id ] ) ) {
@@ -83,6 +85,20 @@ class WCTB_Publisher {
 			if ( null === $services ) {
 				$services = $this->services();
 			}
+
+			$kind = in_array( $channel_id, $settings['title_image'], true ) ? 'title' : 'plain';
+			if ( ! isset( $images[ $kind ] ) ) {
+				$images[ $kind ] = $this->image_url( $post, 'title' === $kind );
+			}
+
+			/**
+			 * Buffer に送る画像の URL。空文字なら画像を付けない。
+			 *
+			 * @param string  $url        画像の URL。
+			 * @param WP_Post $post       投稿。
+			 * @param string  $channel_id チャンネル ID。
+			 */
+			$image_url = (string) apply_filters( 'wctb_post_image_url', $images[ $kind ], $post, $channel_id );
 
 			$metadata = $this->metadata( $services[ $channel_id ] ?? '', $channel_id, $post );
 			$result   = $api->create_post( $channel_id, $text, $image_url, $metadata, $settings['draft'] );
@@ -170,21 +186,20 @@ class WCTB_Publisher {
 	}
 
 	/**
-	 * アイキャッチ画像の URL を返す。Buffer は HTTPS の URL だけを受け付けるので、それ以外は付けない。
+	 * 画像の URL を返す。Buffer は HTTPS の URL だけを受け付けるので、それ以外は付けない。
 	 *
-	 * @param WP_Post $post 投稿。
+	 * @param WP_Post $post        投稿。
+	 * @param bool    $title_image true なら、アイキャッチ画像から作ったタイトル入りの縦長画像を使う。
+	 *                             作れなければ、アイキャッチ画像をそのまま使う。
 	 * @return string
 	 */
-	private function image_url( WP_Post $post ) {
-		$url = get_the_post_thumbnail_url( $post, 'full' );
-		$url = is_string( $url ) && 0 === strpos( $url, 'https://' ) ? $url : '';
+	private function image_url( WP_Post $post, $title_image = false ) {
+		$url = $title_image ? WCTB_Image::generate( $post ) : '';
 
-		/**
-		 * Buffer に送る画像の URL。空文字なら画像を付けない。
-		 *
-		 * @param string  $url  画像の URL。
-		 * @param WP_Post $post 投稿。
-		 */
-		return (string) apply_filters( 'wctb_post_image_url', $url, $post );
+		if ( '' === $url ) {
+			$url = get_the_post_thumbnail_url( $post, 'full' );
+		}
+
+		return is_string( $url ) && 0 === strpos( $url, 'https://' ) ? $url : '';
 	}
 }

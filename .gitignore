@@ -1,3 +1,5 @@
+# tests/sample-image.php が書き出す見本画像
+tests/output/
 
 # Beads / Dolt files (added by bd init)
 .dolt/

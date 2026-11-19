@@ -23,18 +23,20 @@ class WCTB_Options {
 	/**
 	 * 保存済みの設定を、既定値で補って返す。
 	 *
-	 * @return array{api_key:string,channels:string[],tags:int[],draft:bool}
+	 * @return array{api_key:string,channels:string[],tags:int[],draft:bool,title_image:string[]}
 	 */
 	public static function get() {
 		$saved = get_option( self::OPTION, array() );
 		$saved = is_array( $saved ) ? $saved : array();
 
 		return array(
-			'api_key'  => isset( $saved['api_key'] ) ? (string) $saved['api_key'] : '',
-			'channels' => isset( $saved['channels'] ) ? array_values( array_map( 'strval', (array) $saved['channels'] ) ) : array(),
-			'tags'     => isset( $saved['tags'] ) ? array_values( array_map( 'intval', (array) $saved['tags'] ) ) : array(),
+			'api_key'     => isset( $saved['api_key'] ) ? (string) $saved['api_key'] : '',
+			'channels'    => isset( $saved['channels'] ) ? array_values( array_map( 'strval', (array) $saved['channels'] ) ) : array(),
+			'tags'        => isset( $saved['tags'] ) ? array_values( array_map( 'intval', (array) $saved['tags'] ) ) : array(),
 			// 既定は下書き。確認なしに SNS へ公開されないようにする。
-			'draft'    => isset( $saved['draft'] ) ? (bool) $saved['draft'] : true,
+			'draft'       => isset( $saved['draft'] ) ? (bool) $saved['draft'] : true,
+			// タイトル入りの縦長画像を送るチャンネルの ID。
+			'title_image' => isset( $saved['title_image'] ) ? array_values( array_map( 'strval', (array) $saved['title_image'] ) ) : array(),
 		);
 	}
 

@@ -151,6 +151,74 @@ $wctb_check( '指定のタグがない投稿は送らない', 0 === count( $wctb
 $wctb_page = wp_insert_post( array( 'post_title' => 'Page', 'post_status' => 'publish', 'post_type' => 'page' ) );
 $wctb_check( '固定ページは送らない', 0 === count( $wctb_calls ) );
 
+// タイトル入りの縦長画像。ch1 だけに指定する。
+// wp-env は http なので、アップロードの URL を https に見せかけて、画像が付く経路を通す。
+$wctb_https = static function ( $dirs ) {
+	$dirs['url']     = str_replace( 'http://', 'https://', $dirs['url'] );
+	$dirs['baseurl'] = str_replace( 'http://', 'https://', $dirs['baseurl'] );
+
+	return $dirs;
+};
+add_filter( 'upload_dir', $wctb_https );
+
+$wctb_uploads = wp_upload_dir();
+$wctb_source  = trailingslashit( $wctb_uploads['path'] ) . 'wctb-smoke-source.jpg';
+$wctb_canvas  = imagecreatetruecolor( 1600, 900 );
+imagefill( $wctb_canvas, 0, 0, imagecolorallocate( $wctb_canvas, 40, 90, 160 ) );
+imagejpeg( $wctb_canvas, $wctb_source, 90 );
+imagedestroy( $wctb_canvas );
+
+$wctb_attachment = wp_insert_attachment(
+	array(
+		'post_title'     => 'wctb smoke',
+		'post_mime_type' => 'image/jpeg',
+		'post_status'    => 'inherit',
+	),
+	$wctb_source
+);
+
+$wctb_settings = ( new WCTB_Settings() )->sanitize(
+	array(
+		'form'            => '1',
+		'channels_loaded' => '1',
+		'channels'        => array( 'ch1', 'ch2' ),
+		'title_image'     => array( 'ch1' ),
+		'tags_input'      => 'wctb-smoke',
+	)
+);
+update_option( WCTB_Options::OPTION, $wctb_settings );
+$wctb_check( 'タイトル入り画像を送るチャンネルが保存される', array( 'ch1' ) === $wctb_settings['title_image'] );
+
+$wctb_kept = ( new WCTB_Settings() )->sanitize( array( 'form' => '1', 'tags_input' => 'wctb-smoke' ) );
+$wctb_check( '一覧が未表示なら、タイトル入り画像の指定を保つ', array( 'ch1' ) === $wctb_kept['title_image'] );
+
+$wctb_calls = array();
+$wctb_titled = wp_insert_post(
+	array(
+		'post_title'  => '日本語のタイトルを画像に描き込む、折り返しの確認',
+		'post_status' => 'publish',
+		'post_type'   => 'post',
+		'tags_input'  => array( 'wctb-smoke' ),
+		'meta_input'  => array( '_thumbnail_id' => $wctb_attachment ),
+	)
+);
+
+$wctb_title_url  = (string) ( $wctb_calls[0]['input']['assets'][0]['image']['url'] ?? '' );
+$wctb_title_path = trailingslashit( $wctb_uploads['basedir'] ) . WCTB_Image::DIR . '/' . basename( $wctb_title_url );
+$wctb_title_size = is_file( $wctb_title_path ) ? getimagesize( $wctb_title_path ) : array( 0, 0 );
+
+$wctb_check( '指定したチャンネルにはタイトル入り画像の URL を送る', 1 === preg_match( '#^https://.+/wctb/post-' . $wctb_titled . '-[0-9a-f]{12}\.jpg$#', $wctb_title_url ) );
+$wctb_check( 'タイトル入り画像は 1080×1920 になる', 1080 === $wctb_title_size[0] && 1920 === $wctb_title_size[1] );
+$wctb_check( '指定のないチャンネルにはアイキャッチ画像をそのまま送る', 'wctb-smoke-source.jpg' === basename( (string) ( $wctb_calls[1]['input']['assets'][0]['image']['url'] ?? '' ) ) );
+$wctb_check( '同じ画像とタイトルなら作り直さない', WCTB_Image::generate( get_post( $wctb_titled ) ) === $wctb_title_url );
+
+wp_delete_post( $wctb_titled, true );
+$wctb_check( '投稿を消すとタイトル入り画像も消える', ! file_exists( $wctb_title_path ) );
+
+wp_delete_attachment( $wctb_attachment, true );
+remove_filter( 'upload_dir', $wctb_https );
+$wctb_calls = array();
+
 // 予約投稿と画像。
 add_filter(
 	'wctb_post_image_url',

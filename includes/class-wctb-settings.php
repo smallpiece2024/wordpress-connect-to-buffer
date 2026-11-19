@@ -81,10 +81,11 @@ class WCTB_Settings {
 		// フォームからの入力でなければ、形だけ整えて返す。
 		if ( empty( $input['form'] ) ) {
 			return array(
-				'api_key'  => isset( $input['api_key'] ) ? sanitize_text_field( $input['api_key'] ) : '',
-				'channels' => isset( $input['channels'] ) ? array_values( array_map( 'sanitize_text_field', (array) $input['channels'] ) ) : array(),
-				'tags'     => isset( $input['tags'] ) ? array_values( array_filter( array_map( 'absint', (array) $input['tags'] ) ) ) : array(),
-				'draft'    => isset( $input['draft'] ) ? (bool) $input['draft'] : true,
+				'api_key'     => isset( $input['api_key'] ) ? sanitize_text_field( $input['api_key'] ) : '',
+				'channels'    => isset( $input['channels'] ) ? array_values( array_map( 'sanitize_text_field', (array) $input['channels'] ) ) : array(),
+				'tags'        => isset( $input['tags'] ) ? array_values( array_filter( array_map( 'absint', (array) $input['tags'] ) ) ) : array(),
+				'draft'       => isset( $input['draft'] ) ? (bool) $input['draft'] : true,
+				'title_image' => isset( $input['title_image'] ) ? array_values( array_map( 'sanitize_text_field', (array) $input['title_image'] ) ) : array(),
 			);
 		}
 
@@ -113,6 +114,10 @@ class WCTB_Settings {
 		if ( ! empty( $input['channels_loaded'] ) ) {
 			$channels        = isset( $input['channels'] ) ? (array) $input['channels'] : array();
 			$new['channels'] = array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $channels ) ) ) );
+
+			// タイトル入り画像を送るチャンネル。投稿先から外したチャンネルの指定も、選び直したときのために残す。
+			$title_image        = isset( $input['title_image'] ) ? (array) $input['title_image'] : array();
+			$new['title_image'] = array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $title_image ) ) ) );
 		}
 
 		// タグ。名前かスラッグで受け取り、ターム ID で保存する。
@@ -237,16 +242,44 @@ class WCTB_Settings {
 								<p><?php esc_html_e( 'No channels were found in this Buffer account.', 'wordpress-connect-to-buffer' ); ?></p>
 							<?php else : ?>
 								<input type="hidden" name="<?php echo esc_attr( $name ); ?>[channels_loaded]" value="1" />
-								<fieldset>
-									<?php foreach ( $channels as $channel ) : ?>
-										<label>
-											<input type="checkbox" name="<?php echo esc_attr( $name ); ?>[channels][]"
-												value="<?php echo esc_attr( $channel['id'] ); ?>"
-												<?php checked( in_array( $channel['id'], $settings['channels'], true ) ); ?> />
-											<?php echo esc_html( $channel['name'] . ' (' . $channel['service'] . ')' ); ?>
-										</label><br />
-									<?php endforeach; ?>
-								</fieldset>
+								<table class="widefat striped" style="width: auto;">
+									<thead>
+										<tr>
+											<th><?php esc_html_e( 'Send to this channel', 'wordpress-connect-to-buffer' ); ?></th>
+											<th><?php esc_html_e( 'Image', 'wordpress-connect-to-buffer' ); ?></th>
+										</tr>
+									</thead>
+									<tbody>
+										<?php foreach ( $channels as $channel ) : ?>
+											<tr>
+												<td>
+													<label>
+														<input type="checkbox" name="<?php echo esc_attr( $name ); ?>[channels][]"
+															value="<?php echo esc_attr( $channel['id'] ); ?>"
+															<?php checked( in_array( $channel['id'], $settings['channels'], true ) ); ?> />
+														<?php echo esc_html( $channel['name'] . ' (' . $channel['service'] . ')' ); ?>
+													</label>
+												</td>
+												<td>
+													<label>
+														<input type="checkbox" name="<?php echo esc_attr( $name ); ?>[title_image][]"
+															value="<?php echo esc_attr( $channel['id'] ); ?>"
+															<?php checked( in_array( $channel['id'], $settings['title_image'], true ) ); ?> />
+														<?php esc_html_e( 'Vertical image with the title (1080×1920)', 'wordpress-connect-to-buffer' ); ?>
+													</label>
+												</td>
+											</tr>
+										<?php endforeach; ?>
+									</tbody>
+								</table>
+								<p class="description">
+									<?php esc_html_e( 'With "Vertical image with the title", the featured image is cropped to 9:16 around its center and the post title is drawn on it. Channels without it receive the featured image as it is.', 'wordpress-connect-to-buffer' ); ?>
+								</p>
+								<?php if ( ! WCTB_Image::is_supported() ) : ?>
+									<p class="description">
+										<strong><?php esc_html_e( 'This server cannot create the vertical image, because the GD extension of PHP with FreeType support is missing. The featured image is sent as it is.', 'wordpress-connect-to-buffer' ); ?></strong>
+									</p>
+								<?php endif; ?>
 							<?php endif; ?>
 
 							<?php if ( $has_key ) : ?>

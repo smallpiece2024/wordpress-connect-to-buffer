@@ -24,6 +24,7 @@ define( 'WCTB_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
 require_once WCTB_PLUGIN_DIR . 'includes/class-wctb-options.php';
 require_once WCTB_PLUGIN_DIR . 'includes/class-wctb-api.php';
+require_once WCTB_PLUGIN_DIR . 'includes/class-wctb-image.php';
 require_once WCTB_PLUGIN_DIR . 'includes/class-wctb-settings.php';
 require_once WCTB_PLUGIN_DIR . 'includes/class-wctb-publisher.php';
 
@@ -31,6 +32,7 @@ add_action(
 	'plugins_loaded',
 	static function () {
 		( new WCTB_Publisher() )->register();
+		WCTB_Image::register();
 
 		if ( is_admin() ) {
 			( new WCTB_Settings() )->register();
