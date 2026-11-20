@@ -19,6 +19,7 @@ class WCTB_Options {
 	const CHANNEL_TRANSIENT = 'wctb_channels';
 	const SENT_META         = '_wctb_sent';
 	const LOG_LIMIT         = 20;
+	const TEST_POSTS        = 5;
 
 	/**
 	 * 保存済みの設定を、既定値で補って返す。
@@ -93,8 +94,9 @@ class WCTB_Options {
 	 * @param bool   $success 成功したか。
 	 * @param string $message Buffer の投稿 ID、またはエラーの内容。
 	 * @param bool   $draft   下書きとして送ったか。
+	 * @param bool   $test    設定画面からのテスト送信か。
 	 */
-	public static function add_log( $post_id, $channel, $success, $message, $draft = false ) {
+	public static function add_log( $post_id, $channel, $success, $message, $draft = false, $test = false ) {
 		$log = get_option( self::LOG_OPTION, array() );
 		$log = is_array( $log ) ? $log : array();
 
@@ -107,6 +109,7 @@ class WCTB_Options {
 				'success' => (bool) $success,
 				'message' => (string) $message,
 				'draft'   => (bool) $draft,
+				'test'    => (bool) $test,
 			)
 		);
 

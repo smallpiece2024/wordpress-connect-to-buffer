@@ -41,24 +41,78 @@ class WCTB_Publisher {
 			return;
 		}
 
-		if ( '' !== $post->post_password ) {
+		$settings = WCTB_Options::get();
+
+		if ( '' === WCTB_Options::api_key() || ! $settings['channels'] ) {
 			return;
 		}
 
-		$settings = WCTB_Options::get();
-		$api_key  = WCTB_Options::api_key();
-
-		if ( '' === $api_key || ! $settings['channels'] ) {
+		if ( '' !== $this->skip_reason( $post, $settings ) ) {
 			return;
+		}
+
+		// 下書きに戻して再公開したときに、送信済みのチャンネルへ再送しないための記録。
+		$sent = get_post_meta( $post_id, WCTB_Options::SENT_META, true );
+		$sent = is_array( $sent ) ? $sent : array();
+
+		$pending = array_values( array_diff( $settings['channels'], array_keys( $sent ) ) );
+
+		foreach ( $this->send( $post, $settings, $pending, $settings['draft'], false ) as $channel_id => $result ) {
+			if ( ! is_wp_error( $result ) ) {
+				$sent[ $channel_id ] = $result;
+			}
+		}
+
+		update_post_meta( $post_id, WCTB_Options::SENT_META, $sent );
+	}
+
+	/**
+	 * 公開済みの投稿を、設定画面からのテストとして送る。
+	 *
+	 * 公開時と同じ絞り込みを通す。Buffer には必ず下書きとして送るので、SNS には公開されない。
+	 * 送信済みの記録は見ないし、書かない。
+	 *
+	 * @param WP_Post $post 投稿。
+	 * @return array<string,string|WP_Error>|WP_Error チャンネル ID ごとの結果。送らなかったときは、理由をコードに持つ WP_Error。
+	 */
+	public function send_test( WP_Post $post ) {
+		$settings = WCTB_Options::get();
+
+		if ( '' === WCTB_Options::api_key() || ! $settings['channels'] ) {
+			return new WP_Error( 'not_ready', 'not_ready' );
+		}
+
+		if ( 'post' !== $post->post_type || 'publish' !== $post->post_status ) {
+			return new WP_Error( 'not_published', 'not_published' );
+		}
+
+		$reason = $this->skip_reason( $post, $settings );
+		if ( '' !== $reason ) {
+			return new WP_Error( $reason, $reason );
+		}
+
+		return $this->send( $post, $settings, $settings['channels'], true, true );
+	}
+
+	/**
+	 * 投稿を送らない理由を返す。送るなら空文字。
+	 *
+	 * @param WP_Post $post     投稿。
+	 * @param array   $settings 設定。
+	 * @return string password、tags、categories、filter のいずれか。送るなら空文字。
+	 */
+	public function skip_reason( WP_Post $post, array $settings ) {
+		if ( '' !== $post->post_password ) {
+			return 'password';
 		}
 
 		if ( $settings['tags'] && ! has_term( $settings['tags'], 'post_tag', $post ) ) {
-			return;
+			return 'tags';
 		}
 
 		// タグとカテゴリーの両方を指定したときは、両方の条件を満たす投稿だけを送る。
 		if ( $settings['categories'] && ! $this->in_categories( $post, $settings['categories'] ) ) {
-			return;
+			return 'categories';
 		}
 
 		/**
@@ -68,25 +122,33 @@ class WCTB_Publisher {
 		 * @param WP_Post $post 投稿。
 		 */
 		if ( ! apply_filters( 'wctb_should_send', true, $post ) ) {
-			return;
+			return 'filter';
 		}
 
-		// 下書きに戻して再公開したときに、送信済みのチャンネルへ再送しないための記録。
-		$sent = get_post_meta( $post_id, WCTB_Options::SENT_META, true );
-		$sent = is_array( $sent ) ? $sent : array();
+		return '';
+	}
 
+	/**
+	 * 投稿を、指定のチャンネルへ送り、結果をログに残す。
+	 *
+	 * @param WP_Post  $post     投稿。
+	 * @param array    $settings 設定。
+	 * @param string[] $channels 送り先のチャンネル ID。
+	 * @param bool     $draft    Buffer の下書きとして送るか。
+	 * @param bool     $test     テスト送信か。
+	 * @return array<string,string|WP_Error> チャンネル ID ごとの、Buffer の投稿 ID かエラー。
+	 */
+	private function send( WP_Post $post, array $settings, array $channels, $draft, $test ) {
+		$post_id  = $post->ID;
+		$results  = array();
 		$text     = $this->build_text( $post );
-		$api      = new WCTB_Api( $api_key );
+		$api      = new WCTB_Api( WCTB_Options::api_key() );
 		$services = null;
 
 		// 画像の URL。そのままのもの（plain）とタイトル入りのもの（title）を、必要になったときに 1 回だけ作る。
 		$images = array();
 
-		foreach ( $settings['channels'] as $channel_id ) {
-			if ( isset( $sent[ $channel_id ] ) ) {
-				continue;
-			}
-
+		foreach ( $channels as $channel_id ) {
 			if ( null === $services ) {
 				$services = $this->services();
 			}
@@ -106,18 +168,18 @@ class WCTB_Publisher {
 			$image_url = (string) apply_filters( 'wctb_post_image_url', $images[ $kind ], $post, $channel_id );
 
 			$metadata = $this->metadata( $services[ $channel_id ] ?? '', $channel_id, $post, 'title' === $kind );
-			$result   = $api->create_post( $channel_id, $text, $image_url, $metadata, $settings['draft'] );
+			$result   = $api->create_post( $channel_id, $text, $image_url, $metadata, $draft );
+
+			$results[ $channel_id ] = $result;
 
 			if ( is_wp_error( $result ) ) {
-				WCTB_Options::add_log( $post_id, $channel_id, false, $result->get_error_message(), $settings['draft'] );
-				continue;
+				WCTB_Options::add_log( $post_id, $channel_id, false, $result->get_error_message(), $draft, $test );
+			} else {
+				WCTB_Options::add_log( $post_id, $channel_id, true, $result, $draft, $test );
 			}
-
-			$sent[ $channel_id ] = $result;
-			WCTB_Options::add_log( $post_id, $channel_id, true, $result, $settings['draft'] );
 		}
 
-		update_post_meta( $post_id, WCTB_Options::SENT_META, $sent );
+		return $results;
 	}
 
 	/**

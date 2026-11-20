@@ -17,12 +17,16 @@ class WCTB_Settings {
 	const PAGE  = 'wctb';
 	const GROUP = 'wctb';
 
+	const TEST_ACTION = 'wctb_test_send';
+	const TEST_NOTICE = 'wctb_test_notice_';
+
 	/**
 	 * フックを登録する。
 	 */
 	public function register() {
 		add_action( 'admin_menu', array( $this, 'add_page' ) );
 		add_action( 'admin_init', array( $this, 'register_setting' ) );
+		add_action( 'admin_post_' . self::TEST_ACTION, array( $this, 'handle_test_send' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( WCTB_PLUGIN_FILE ), array( $this, 'action_links' ) );
 	}
 
@@ -175,6 +179,121 @@ class WCTB_Settings {
 	}
 
 	/**
+	 * テスト送信を実行し、結果を設定画面に表示するために残して、設定画面へ戻る。
+	 */
+	public function handle_test_send() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You are not allowed to do this.', 'wordpress-connect-to-buffer' ), 403 );
+		}
+
+		check_admin_referer( self::TEST_ACTION );
+
+		$post   = get_post( isset( $_POST['wctb_test_post'] ) ? absint( $_POST['wctb_test_post'] ) : 0 );
+		$result = $post instanceof WP_Post ? ( new WCTB_Publisher() )->send_test( $post ) : new WP_Error( 'not_published', 'not_published' );
+
+		if ( is_wp_error( $result ) ) {
+			$notice = array(
+				'type'    => 'warning',
+				/* translators: %s: reason. */
+				'message' => sprintf( __( 'The test was not sent: %s', 'wordpress-connect-to-buffer' ), $this->reason_label( $result->get_error_code() ) ),
+			);
+		} else {
+			$failed = count( array_filter( $result, 'is_wp_error' ) );
+			$notice = array(
+				'type'    => $failed ? 'error' : 'success',
+				'message' => sprintf(
+					/* translators: 1: post title, 2: number of channels that succeeded, 3: number of channels that failed. */
+					__( 'Test of "%1$s": saved as a draft in Buffer for %2$d channel(s), failed for %3$d. Details are in "Recent activity" below.', 'wordpress-connect-to-buffer' ),
+					get_the_title( $post ),
+					count( $result ) - $failed,
+					$failed
+				),
+			);
+		}
+
+		set_transient( self::TEST_NOTICE . get_current_user_id(), $notice, MINUTE_IN_SECONDS );
+
+		wp_safe_redirect( admin_url( 'options-general.php?page=' . self::PAGE ) );
+		exit;
+	}
+
+	/**
+	 * 送らない理由を、画面に出す文にする。
+	 *
+	 * @param string $reason WCTB_Publisher が返す理由のコード。
+	 * @return string
+	 */
+	private function reason_label( $reason ) {
+		switch ( $reason ) {
+			case 'password':
+				return __( 'the post is password protected', 'wordpress-connect-to-buffer' );
+			case 'tags':
+				return __( 'the post has none of the tags', 'wordpress-connect-to-buffer' );
+			case 'categories':
+				return __( 'the post is in none of the categories', 'wordpress-connect-to-buffer' );
+			case 'filter':
+				return __( 'the wctb_should_send filter rejected the post', 'wordpress-connect-to-buffer' );
+			case 'not_ready':
+				return __( 'the API key or the channels are not set', 'wordpress-connect-to-buffer' );
+			default:
+				return __( 'the post is not a published post', 'wordpress-connect-to-buffer' );
+		}
+	}
+
+	/**
+	 * テスト送信の欄を出力する。
+	 *
+	 * @param array $settings 設定。
+	 * @param bool  $has_key  API キーがあるか。
+	 */
+	private function render_test( array $settings, $has_key ) {
+		$posts = get_posts(
+			array(
+				'post_type'        => 'post',
+				'post_status'      => 'publish',
+				'numberposts'      => WCTB_Options::TEST_POSTS,
+				'orderby'          => 'date',
+				'order'            => 'DESC',
+				'suppress_filters' => true,
+			)
+		);
+
+		$publisher = new WCTB_Publisher();
+		?>
+		<h2><?php esc_html_e( 'Test', 'wordpress-connect-to-buffer' ); ?></h2>
+		<p>
+			<?php esc_html_e( 'Sends a published post to Buffer without publishing anything new. A test is always saved as a draft in Buffer, even when "Add it to the queue" is selected, so nothing reaches your social accounts. It uses the saved settings, including tags and categories, and it sends to every selected channel even if the post was sent before. Delete the drafts in Buffer afterwards.', 'wordpress-connect-to-buffer' ); ?>
+		</p>
+		<?php if ( ! $has_key || ! $settings['channels'] ) : ?>
+			<p><?php esc_html_e( 'Save an API key and select channels to run a test.', 'wordpress-connect-to-buffer' ); ?></p>
+		<?php elseif ( ! $posts ) : ?>
+			<p><?php esc_html_e( 'There is no published post to test with.', 'wordpress-connect-to-buffer' ); ?></p>
+		<?php else : ?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="<?php echo esc_attr( self::TEST_ACTION ); ?>" />
+				<?php wp_nonce_field( self::TEST_ACTION ); ?>
+				<label for="wctb-test-post" class="screen-reader-text"><?php esc_html_e( 'Post to send', 'wordpress-connect-to-buffer' ); ?></label>
+				<select id="wctb-test-post" name="wctb_test_post">
+					<?php foreach ( $posts as $post ) : ?>
+						<?php
+						$reason = $publisher->skip_reason( $post, $settings );
+						$status = '' === $reason
+							? __( 'will be sent', 'wordpress-connect-to-buffer' )
+							/* translators: %s: reason. */
+							: sprintf( __( 'will not be sent: %s', 'wordpress-connect-to-buffer' ), $this->reason_label( $reason ) );
+						?>
+						<option value="<?php echo esc_attr( $post->ID ); ?>">
+							<?php echo esc_html( get_the_date( 'Y-m-d', $post ) . ' ' . get_the_title( $post ) . ' — ' . $status ); ?>
+						</option>
+					<?php endforeach; ?>
+				</select>
+				<?php submit_button( __( 'Send a test to Buffer', 'wordpress-connect-to-buffer' ), 'secondary', 'submit', false ); ?>
+			</form>
+		<?php endif; ?>
+		<?php
+	}
+
+	/**
 	 * カテゴリーの名前を、上位のカテゴリーから順に「 > 」でつないで返す。
 	 *
 	 * @param int $category_id カテゴリーの ID。
@@ -230,6 +349,16 @@ class WCTB_Settings {
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
+
+			<?php
+			$notice = get_transient( self::TEST_NOTICE . get_current_user_id() );
+			if ( is_array( $notice ) && isset( $notice['type'], $notice['message'] ) ) :
+				delete_transient( self::TEST_NOTICE . get_current_user_id() );
+				?>
+				<div class="notice notice-<?php echo esc_attr( $notice['type'] ); ?>">
+					<p><?php echo esc_html( $notice['message'] ); ?></p>
+				</div>
+			<?php endif; ?>
 
 			<form method="post" action="options.php">
 				<?php settings_fields( self::GROUP ); ?>
@@ -471,6 +600,8 @@ class WCTB_Settings {
 			}() );
 			</script>
 
+			<?php $this->render_test( $settings, $has_key ); ?>
+
 			<?php $this->render_log( is_array( $channels ) ? $channels : array() ); ?>
 		</div>
 		<?php
@@ -511,13 +642,20 @@ class WCTB_Settings {
 						<td>
 							<?php
 							if ( $entry['success'] && ! empty( $entry['draft'] ) ) {
-								esc_html_e( 'Saved as draft', 'wordpress-connect-to-buffer' );
+								$result = __( 'Saved as draft', 'wordpress-connect-to-buffer' );
 							} elseif ( $entry['success'] ) {
-								esc_html_e( 'Added to queue', 'wordpress-connect-to-buffer' );
+								$result = __( 'Added to queue', 'wordpress-connect-to-buffer' );
 							} else {
 								/* translators: %s: error message. */
-								echo esc_html( sprintf( __( 'Failed: %s', 'wordpress-connect-to-buffer' ), $entry['message'] ) );
+								$result = sprintf( __( 'Failed: %s', 'wordpress-connect-to-buffer' ), $entry['message'] );
 							}
+
+							if ( ! empty( $entry['test'] ) ) {
+								/* translators: %s: result of a test. */
+								$result = sprintf( __( 'Test: %s', 'wordpress-connect-to-buffer' ), $result );
+							}
+
+							echo esc_html( $result );
 							?>
 						</td>
 					</tr>

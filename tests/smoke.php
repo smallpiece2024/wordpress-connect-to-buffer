@@ -334,6 +334,65 @@ $wctb_check( 'タグとカテゴリーの両方を満たす投稿は送る', 2 =
 $wctb_check( 'カテゴリーだけを満たす投稿は送らない', 0 === $wctb_publish( 'Category only', array( $wctb_cat_child ) ) );
 $wctb_check( 'タグだけを満たす投稿は送らない', 0 === $wctb_publish( 'Tag only', array( $wctb_cat_other ), array( 'wctb-smoke' ) ) );
 
+// テスト送信。設定は「キューに追加」、タグ wctb-smoke、カテゴリー wctb-smoke-parent。
+$wctb_publisher = new WCTB_Publisher();
+$wctb_target    = get_post( $wctb_cat_posts[6] ); // Tag and category。公開時に ch1 へ送信済み。
+$wctb_sent_meta = get_post_meta( $wctb_target->ID, WCTB_Options::SENT_META, true );
+
+$wctb_calls  = array();
+$wctb_result = $wctb_publisher->send_test( $wctb_target );
+$wctb_log    = WCTB_Options::get_log();
+
+$wctb_check( 'テスト送信は送信済みのチャンネルにも送る', 2 === count( $wctb_calls ) && is_array( $wctb_result ) && 'ch1' === $wctb_calls[0]['input']['channelId'] );
+$wctb_check( 'テスト送信は「キューに追加」の設定でも下書きとして送る', true === ( $wctb_calls[0]['input']['saveToDraft'] ?? null ) && true === ( $wctb_calls[1]['input']['saveToDraft'] ?? null ) );
+$wctb_check( 'テスト送信はチャンネルごとの結果を返す', is_string( $wctb_result['ch1'] ?? null ) && is_wp_error( $wctb_result['ch2'] ?? null ) );
+$wctb_check( 'テスト送信であることがログに残る', true === ( $wctb_log[0]['test'] ?? null ) && true === ( $wctb_log[0]['draft'] ?? null ) && $wctb_target->ID === $wctb_log[0]['post_id'] );
+$wctb_check( 'テスト送信は送信済みの記録を変えない', get_post_meta( $wctb_target->ID, WCTB_Options::SENT_META, true ) === $wctb_sent_meta );
+
+$wctb_calls  = array();
+$wctb_result = $wctb_publisher->send_test( get_post( $wctb_cat_posts[8] ) ); // Tag only。
+$wctb_check( '絞り込みの対象外の投稿はテスト送信せず、理由を返す', 0 === count( $wctb_calls ) && is_wp_error( $wctb_result ) && 'categories' === $wctb_result->get_error_code() );
+
+$wctb_result = $wctb_publisher->send_test( get_post( $wctb_cat_posts[7] ) ); // Category only。
+$wctb_check( 'タグが合わない投稿は、タグを理由として返す', 0 === count( $wctb_calls ) && is_wp_error( $wctb_result ) && 'tags' === $wctb_result->get_error_code() );
+
+$wctb_unpublished = wp_insert_post( array( 'post_title' => 'Unpublished', 'post_status' => 'draft', 'post_type' => 'post' ) );
+$wctb_result      = $wctb_publisher->send_test( get_post( $wctb_unpublished ) );
+$wctb_check( '公開していない投稿はテスト送信しない', 0 === count( $wctb_calls ) && is_wp_error( $wctb_result ) && 'not_published' === $wctb_result->get_error_code() );
+$wctb_cat_posts[] = $wctb_unpublished;
+
+// 設定画面からの実行。転送の直前で例外を投げて、exit を避ける。
+wp_set_current_user( 1 );
+$wctb_stop = static function () {
+	throw new RuntimeException( 'redirect' );
+};
+add_filter( 'wp_redirect', $wctb_stop, 1 );
+
+$_POST['wctb_test_post'] = (string) $wctb_target->ID;
+$_REQUEST['_wpnonce']    = wp_create_nonce( WCTB_Settings::TEST_ACTION );
+$wctb_calls              = array();
+
+try {
+	( new WCTB_Settings() )->handle_test_send();
+} catch ( RuntimeException $wctb_exception ) {
+	unset( $wctb_exception );
+}
+remove_filter( 'wp_redirect', $wctb_stop, 1 );
+
+$wctb_notice = get_transient( WCTB_Settings::TEST_NOTICE . '1' );
+$wctb_check( '設定画面からのテスト送信で 2 つのチャンネルへ送る', 2 === count( $wctb_calls ) );
+$wctb_check( '設定画面に出す結果が残る', is_array( $wctb_notice ) && 'error' === $wctb_notice['type'] && false !== strpos( $wctb_notice['message'], 'for 1 channel(s), failed for 1' ) );
+
+ob_start();
+( new WCTB_Settings() )->render();
+$wctb_html = ob_get_clean();
+$wctb_check( '設定画面に結果とテスト送信の欄が出る', false !== strpos( $wctb_html, 'notice notice-error' ) && false !== strpos( $wctb_html, 'name="wctb_test_post"' ) && false !== strpos( $wctb_html, 'Tag only — will not be sent: the post is in none of the categories' ) );
+$wctb_check( '結果は 1 回だけ表示する', false === get_transient( WCTB_Settings::TEST_NOTICE . '1' ) );
+$wctb_check( 'ログにテスト送信と表示する', false !== strpos( $wctb_html, 'Test: Saved as draft' ) && false !== strpos( $wctb_html, 'Test: Failed: mock failure' ) );
+
+unset( $_POST['wctb_test_post'], $_REQUEST['_wpnonce'] );
+wp_set_current_user( 0 );
+
 // 後始末。
 foreach ( array_merge( array( $wctb_post, $wctb_no_tag, $wctb_page, $wctb_future, $wctb_all ), $wctb_cat_posts ) as $wctb_id ) {
 	wp_delete_post( $wctb_id, true );
