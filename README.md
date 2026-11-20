@@ -6,12 +6,12 @@ Bufferへ投稿するプラグイン
 | 項目 | 内容 |
 |---|---|
 | サービス名 | wordpress-connect-to-buffer |
-| 段階 | 開発中 |
+| 段階 | 公開中 |
 | GitHub リポジトリ | https://github.com/smallpiece2024/wordpress-connect-to-buffer |
 | URL | 未定 |
 | インフラ | WordPress、Buffer |
 | 説明 | WordPress から Buffer へ投稿するプラグイン |
-| 公開日 | 未公開 |
+| 公開日 | 2026-11-21 |
 | UptimeRobot monitor ID | なし |
 
 ## できること
