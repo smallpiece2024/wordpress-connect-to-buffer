@@ -1,72 +1,148 @@
-# Connect to Buffer
+# wordpress-connect-to-buffer
+Bufferへ投稿するプラグイン
 
-A WordPress plugin that sends a post to Buffer with its title, URL and featured image when it is published, as a draft or straight into your queue.
+## サービス情報
 
-## Service information
-
-| Item | Value |
+| 項目 | 内容 |
 |---|---|
-| Service name | wordpress-connect-to-buffer |
-| Stage | In development |
-| GitHub repository | https://github.com/smallpiece2024/wordpress-connect-to-buffer |
-| URL | TBD |
-| Infrastructure | WordPress, Buffer |
-| Description | A WordPress plugin that sends posts to Buffer |
-| Release date | Not released |
-| UptimeRobot monitor ID | None |
+| サービス名 | wordpress-connect-to-buffer |
+| 段階 | 開発中 |
+| GitHub リポジトリ | https://github.com/smallpiece2024/wordpress-connect-to-buffer |
+| URL | 未定 |
+| インフラ | WordPress、Buffer |
+| 説明 | WordPress から Buffer へ投稿するプラグイン |
+| 公開日 | 未公開 |
+| UptimeRobot monitor ID | なし |
 
-## Documentation
+## できること
 
-- [readme.txt](readme.txt): what the plugin does, how to install and set it up, FAQ and changelog. It follows the readme format of the WordPress.org Plugin Directory.
-- [README.ja.md](README.ja.md): the earlier README in Japanese. It describes the plugin as of version 0.4.2.
+投稿を公開すると、タイトル、URL、アイキャッチ画像を Buffer に送る。
 
-## Requirements
+- Buffer の下書きとして保存するか、キューに追加するかを選べる。既定は下書き。下書きは、Buffer で予約するまで SNS に公開されない。キューに追加したものは、投稿スケジュールの次の枠で自動的に公開される。
+- タイトルの前に、固定の文面（「○○に新しい記事を公開しました」など）を付けられる。Buffer に送る本文と、タイトル入りの縦長画像の両方に入る。
+- 対象は通常の「投稿」だけ。固定ページとカスタム投稿タイプは送らない。
+- 送るのは、初めて公開したときの 1 回だけ。公開済みの投稿を更新しても送らない。予約投稿は、公開された時点で送る。
+- 投稿先のチャンネルは複数選べる。
+- チャンネルごとに、アイキャッチ画像をそのまま送るか、タイトル入りの縦長画像（1080×1920）に加工して送るかを選べる。
+- タグを指定すると、そのタグのいずれかが付いた投稿だけを送る。指定しなければ、すべての投稿を送る。
+- カテゴリーを指定すると、そのカテゴリーのいずれかに入っている投稿だけを送る。上位のカテゴリーを指定すると、その下位のカテゴリーの投稿もすべて対象になる。指定しなければ、カテゴリーを問わずに送る。
+- タグとカテゴリーの両方を指定したときは、両方の条件を満たす投稿だけを送る。
+- パスワードで保護した投稿は送らない。
+- 設定画面から、公開済みの投稿をテストとして送れる。新しい投稿を公開しなくても、動作を確かめられる。
 
-- WordPress 5.6 or later, PHP 7.4 or later
-- A Buffer account and an API key
-- The GD extension of PHP with FreeType support, if you use the vertical image with the title
+## 必要なもの
 
-## Installation
+- WordPress 5.6 以降、PHP 7.4 以降
+- Buffer のアカウントと API キー
+- タイトル入りの縦長画像を使うときは、PHP の GD 拡張（FreeType 対応）
 
-1. Put this repository in `wp-content/plugins/wordpress-connect-to-buffer` and activate the plugin.
-2. Create an API key in the [API settings of Buffer](https://publish.buffer.com/settings/api).
-3. Open "Settings > Connect to Buffer", save the API key and choose the channels.
+## 使い方
 
-See [readme.txt](readme.txt) for the rest of the settings.
+1. このリポジトリを `wp-content/plugins/wordpress-connect-to-buffer` に置き、プラグインを有効にする。
+2. Buffer の [API 設定](https://publish.buffer.com/settings/api) で API キーを作る。
+3. 「設定 > Connect to Buffer」を開き、API キーを保存する。
+4. 表示されたチャンネルから投稿先を選び、送り方（下書きかキューか）と、必要ならタグとカテゴリーを指定して保存する。カテゴリーは、プルダウンから選んで「Add」を押すと一覧に足される。一覧から外すときは「Remove」を押す。タイトル入りの縦長画像を送りたいチャンネルには、「Vertical image with the title (1080×1920)」にチェックを入れる。
 
-## Development
+設定画面は 3 つのタブに分かれている。「Settings」で設定し、「Test」でテスト送信をし、「Recent activity」で送信の結果を見る。送信の結果は、直近 20 件が表示される。
 
-With Docker and Node.js, `@wordpress/env` starts a local WordPress.
+### タイトルの前に付ける文面
 
+タイトルだけでは何の投稿か伝わらないときは、「Settings」のタブの「Text before the title」に固定の文面を入れる。たとえば「○○に新しい記事を公開しました」。
+
+- Buffer に送る本文では、タイトルの前の行に入る。本文は「文面、タイトル、URL」の 3 行になる。
+- タイトル入りの縦長画像では、タイトルの上に、小さめの文字で、タイトルより少し暗い色で入る。2 行に収まらない分は「…」で切る。
+- 文面やタイトルに URL が含まれていても、縦長画像には描かない。画像の中の URL は押せず、長くて場所を取るため。本文には残る。
+- 空欄なら、これまでどおりタイトルだけを送る。
+
+### テスト送信
+
+新しい投稿を公開せずに動作を確かめたいときは、設定画面の「Test」のタブを使う。
+
+1. 「Settings」のタブで設定を保存する。テスト送信は、保存済みの設定で動く。
+2. 「Test」のタブを開き、プルダウンから投稿を選ぶ。公開済みの投稿が、新しい順に 5 件まで並ぶ。それぞれに、いまの設定で送る対象になるか（will be sent）、ならないか（will not be sent と、その理由）が表示される。
+3. 「Send a test to Buffer」を押す。送信すると「Recent activity」のタブに移り、結果が表示される。対象にならない投稿を選んだときは、「Test」のタブに戻って理由が表示される。
+
+- テスト送信は、送り方で「キューに追加」を選んでいても、必ず Buffer の下書きとして送る。SNS には公開されない。確認が済んだら、Buffer で下書きを消す。
+- タグとカテゴリーの絞り込みは、公開時と同じように働く。対象にならない投稿は送らず、理由を表示する。
+- 選んだチャンネルのすべてに送る。その投稿を以前に送っていても送る。テスト送信をしても、送信済みの記録は変わらない。
+
+### API キーを wp-config.php に書く
+
+API キーをデータベースに保存したくないときは、`wp-config.php` に定数を書く。定数があれば、設定画面の入力より優先される。
+
+```php
+define( 'WCTB_API_KEY', 'ここに API キー' );
 ```
-npx @wordpress/env start
-```
 
-Open http://localhost:8888/wp-admin/ and log in with the user name `admin` and the password `password`.
+### 画像について
 
-Run the check script with the following command. It mocks the requests to Buffer, so no real post is created. The saved settings and the activity log are restored afterwards.
+Buffer は画像を URL から取得する。そのため、アイキャッチ画像は次の条件を満たす必要がある。満たさないと、画像なしで送るか、Buffer 側でエラーになる。
 
-```
-npx @wordpress/env run cli wp eval-file wp-content/plugins/wordpress-connect-to-buffer/tests/smoke.php
-```
+- HTTPS で配信されている。HTTPS でない画像は付けずに送る。
+- ログインなしで直接開ける。
+- サイトの bot 保護（Cloudflare など）が、Buffer からの取得を拒否しない。
 
-Write samples of the vertical image to `tests/output/` with the following command.
+### タイトル入りの縦長画像
+
+Instagram のストーリーズなど、縦長の画像を使う投稿先のための加工。チャンネルごとに有効にできる。
+
+- アイキャッチ画像の中央を 9:16 に切り抜き、1080×1920 にする。元の画像の短いほうの辺をそのまま使う。横長の画像なら縦をすべて使って左右を切り、9:16 より縦長の画像なら横をすべて使って上下を切る。
+- 画像の中央に半透明の帯を敷き、投稿のタイトルを白い文字で描く。長いタイトルは折り返し、文字を小さくしても 6 行に収まらない分は「…」で切る。
+- この加工を有効にした Instagram のチャンネルには、ストーリーズ（`type: story`）として送る。9:16 の画像は、フィード投稿で使える比率（4:5〜1.91:1）に収まらないため。ストーリーズには本文（タイトルと URL）が付かない。
+- 文字は同梱の Noto Sans JP（Bold）で描くので、日本語のタイトルも描ける。
+- 生成した画像は `wp-content/uploads/wctb/` に保存する。投稿を完全に削除したときと、プラグインを削除したときに消す。
+- アイキャッチ画像がない、サーバーの PHP に GD 拡張（FreeType 対応）がないなどで生成できなければ、アイキャッチ画像をそのまま送る。
+
+見本は次のコマンドで `tests/output/` に書き出せる。
 
 ```
 npx @wordpress/env run cli wp eval-file wp-content/plugins/wordpress-connect-to-buffer/tests/sample-image.php
 ```
 
-When you change how the plugin behaves, raise the version in three places: the `Version` header and `WCTB_VERSION` in `wordpress-connect-to-buffer.php`, and `Stable tag` in `readme.txt`. Add the change to the changelog in `readme.txt`.
+### フィルター
 
-## Infrastructure
+| フィルター | 用途 |
+|---|---|
+| `wctb_should_send` | 投稿ごとに送るかどうかを変える |
+| `wctb_post_text` | Buffer に送る本文を変える |
+| `wctb_post_image_url` | Buffer に送る画像の URL を変える。空文字なら画像を付けない。第 3 引数でチャンネル ID を受け取れる |
+| `wctb_lead_text` | タイトルの前に付ける文面を、投稿ごとに変える。空文字なら付けない |
+| `wctb_title_image_text` | 縦長画像に描き込む文字を変える。空文字なら何も描かない |
+| `wctb_title_image_font` | 縦長画像の文字に使うフォントファイル（TrueType か OpenType）のパスを変える |
+| `wctb_post_metadata` | サービス固有の指定を変える。Facebook と Instagram には、通常の投稿（`type: post`）として送る指定を付けている。縦長画像を有効にした Instagram のチャンネルは `type: story` になる |
 
-| Service | Purpose | Where it is configured |
+## 開発
+
+Docker と Node.js があれば、`@wordpress/env` で手元に WordPress を起動できる。
+
+```
+npx @wordpress/env start
+```
+
+http://localhost:8888/wp-admin/ を開き、ユーザー名 `admin`、パスワード `password` でログインする。
+
+動作確認のスクリプトは次のコマンドで実行する。Buffer への通信は模擬するので、実際の投稿は作られない。保存済みの設定と送信ログは、実行後に元へ戻る。
+
+```
+npx @wordpress/env run cli wp eval-file wp-content/plugins/wordpress-connect-to-buffer/tests/smoke.php
+```
+
+### 英語の説明（readme.txt）
+
+利用者向けの英語の説明は `readme.txt` にある。WordPress.org のプラグインディレクトリが定める形式で、機能、インストールの手順、FAQ、変更履歴を書いている。
+
+- 機能を変えたら、この README と `readme.txt` の両方を直す。
+- プラグインの挙動を変えたら、バージョンを 3 か所で同じ値に上げる。`wordpress-connect-to-buffer.php` のヘッダーの `Version` と定数 `WCTB_VERSION`、`readme.txt` の `Stable tag`。あわせて、`readme.txt` の `== Changelog ==` に変更点を足す。
+
+## インフラ
+
+| サービス | 用途 | 設定の場所 |
 |---|---|---|
-| WordPress | The site that runs the plugin | The admin screen of the site where the plugin is installed |
-| Buffer | Scheduling posts on social media. The plugin saves a draft or adds to the queue through the GraphQL API | The settings screen "Settings > Connect to Buffer", or the constant `WCTB_API_KEY` in `wp-config.php` |
+| WordPress | プラグインを動かすサイト | プラグインを入れるサイトの管理画面で設定 |
+| Buffer | SNS への投稿の予約。GraphQL API で下書きまたはキューに追加する | 設定画面「設定 > Connect to Buffer」、または `wp-config.php` の定数 `WCTB_API_KEY` |
 
-## License
+## ライセンス
 
 GPL-2.0-or-later
 
-The bundled font Noto Sans JP (`assets/fonts/NotoSansJP-Bold.otf`) is distributed under the SIL Open Font License 1.1. The full text of the license is in `assets/fonts/OFL.txt`.
+同梱のフォント Noto Sans JP（`assets/fonts/NotoSansJP-Bold.otf`）は、SIL Open Font License 1.1 で配布されている。ライセンスの全文は `assets/fonts/OFL.txt` にある。
