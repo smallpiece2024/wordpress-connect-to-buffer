@@ -232,6 +232,18 @@ remove_filter( 'wctb_lead_text', $wctb_other_lead );
 $wctb_check( '固定の文面を変えると、画像を作り直して古いものを消す', '' !== $wctb_relead_url && $wctb_relead_url !== $wctb_title_url && ! file_exists( $wctb_title_path ) && 1 === count( (array) glob( $wctb_title_glob ) ) );
 $wctb_check( '固定の文面を入れた画像も 1080×1920 になる', 1080 === $wctb_relead_size[0] && 1920 === $wctb_relead_size[1] );
 
+// 画像に描く文字からは URL を除く。本文には残す。
+$wctb_check( '画像に描く文字から URL を除く', 'サイトに新しい記事を公開しました' === WCTB_Image::strip_urls( 'サイト（https://example.com/path?a=1&b=2）に新しい記事を公開しました https://example.com/' ) );
+$wctb_check( 'URL のない文字はそのまま描く', '【2026年版】「おすすめ」10 選 (保存版)' === WCTB_Image::strip_urls( '【2026年版】「おすすめ」10 選 (保存版)' ) );
+
+$wctb_url_lead = static function () {
+	return '別の文面 https://example.com/';
+};
+add_filter( 'wctb_lead_text', $wctb_url_lead );
+$wctb_same_url = WCTB_Image::generate( get_post( $wctb_titled ) );
+remove_filter( 'wctb_lead_text', $wctb_url_lead );
+$wctb_check( '文面に URL を足しても、画像は変わらない', $wctb_same_url === $wctb_relead_url );
+
 wp_delete_post( $wctb_titled, true );
 $wctb_check( '投稿を消すとタイトル入り画像も消える', array() === (array) glob( $wctb_title_glob ) );
 

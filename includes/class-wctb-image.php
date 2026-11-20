@@ -99,7 +99,7 @@ class WCTB_Image {
 		 * @param string  $title 文字。
 		 * @param WP_Post $post  投稿。
 		 */
-		$title = trim( (string) preg_replace( '/\s+/u', ' ', (string) apply_filters( 'wctb_title_image_text', $title, $post ) ) );
+		$title = self::strip_urls( (string) apply_filters( 'wctb_title_image_text', $title, $post ) );
 
 		$uploads = wp_upload_dir();
 		if ( ! empty( $uploads['error'] ) ) {
@@ -111,7 +111,7 @@ class WCTB_Image {
 			return '';
 		}
 
-		$lead = WCTB_Options::lead( $post );
+		$lead = self::strip_urls( WCTB_Options::lead( $post ) );
 		$font = self::font_path();
 		$hash = substr( md5( implode( '|', array( $lead, $title, $source, (string) filemtime( $source ), $font, WCTB_VERSION ) ) ), 0, 12 );
 		$name = 'post-' . (int) $post->ID . '-' . $hash . '.jpg';
@@ -144,6 +144,21 @@ class WCTB_Image {
 		imagedestroy( $canvas );
 
 		return $saved ? $url : '';
+	}
+
+	/**
+	 * 画像に描く文字から URL を除く。画像の中の URL は押せず、長くて場所を取るため。
+	 *
+	 * URL を除いて空になった括弧も消し、空白を 1 つにまとめる。
+	 *
+	 * @param string $text 文字列。
+	 * @return string
+	 */
+	public static function strip_urls( $text ) {
+		$text = (string) preg_replace( '#https?://[\x21-\x7E]+#i', ' ', $text );
+		$text = (string) preg_replace( '/[（(\[「『【]\s*[）)\]」』】]/u', '', $text );
+
+		return trim( (string) preg_replace( '/\s+/u', ' ', $text ) );
 	}
 
 	/**
