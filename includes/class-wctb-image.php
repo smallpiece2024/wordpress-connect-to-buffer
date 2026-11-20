@@ -37,6 +37,9 @@ class WCTB_Image {
 	const LEAD_MAX_LINES = 2;
 	const LEAD_GAP       = 36;
 
+	// 固定の文面の文字の明るさ（0〜255）。タイトルは白（255）。
+	const LEAD_BRIGHTNESS = 200;
+
 	// 行頭に置かない文字。前の文字にくっつける。
 	const NO_LINE_START = '、。，．！？!?）)」』】〕〉》・…ー々ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮ';
 
@@ -281,8 +284,9 @@ class WCTB_Image {
 			imagecolorallocatealpha( $canvas, 0, 0, 0, 50 )
 		);
 
-		self::draw_lines( $canvas, $lead_lines, self::LEAD_SIZE, $font, $top );
-		self::draw_lines( $canvas, $lines, $size, $font, $top + $lead_height + $gap );
+		// 固定の文面は、タイトルと見分けがつくように少し暗い色で描く。
+		self::draw_lines( $canvas, $lead_lines, self::LEAD_SIZE, $font, $top, self::LEAD_BRIGHTNESS );
+		self::draw_lines( $canvas, $lines, $size, $font, $top + $lead_height + $gap, 255 );
 	}
 
 	/**
@@ -296,18 +300,19 @@ class WCTB_Image {
 	}
 
 	/**
-	 * 行を、左右の中央に白で描く。
+	 * 行を、左右の中央に描く。
 	 *
-	 * @param resource|GdImage $canvas 描き込む画像。
-	 * @param string[]         $lines  行。
-	 * @param int              $size   文字の大きさ（pt）。
-	 * @param string           $font   フォントファイルのパス。
-	 * @param int              $top    最初の行の上端（px）。
+	 * @param resource|GdImage $canvas     描き込む画像。
+	 * @param string[]         $lines      行。
+	 * @param int              $size       文字の大きさ（pt）。
+	 * @param string           $font       フォントファイルのパス。
+	 * @param int              $top        最初の行の上端（px）。
+	 * @param int              $brightness 文字の明るさ（0〜255）。255 が白。
 	 */
-	private static function draw_lines( $canvas, array $lines, $size, $font, $top ) {
+	private static function draw_lines( $canvas, array $lines, $size, $font, $top, $brightness ) {
 		$em          = $size * 96 / 72;
 		$line_height = self::line_height( $size );
-		$white       = imagecolorallocate( $canvas, 255, 255, 255 );
+		$white       = imagecolorallocate( $canvas, $brightness, $brightness, $brightness );
 
 		foreach ( array_values( $lines ) as $index => $line ) {
 			$box = imagettfbbox( $size, 0, $font, $line );
