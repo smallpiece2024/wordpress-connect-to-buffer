@@ -240,7 +240,11 @@ class WCTB_Publisher {
 			$metadata['facebook'] = array( 'type' => 'post' );
 		} elseif ( 'instagram' === $service && $vertical ) {
 			// 9:16 の画像はフィード投稿の比率（4:5〜1.91:1）に収まらないので、ストーリーズとして送る。
-			$metadata['instagram'] = array( 'type' => 'story' );
+			// shouldShareToFeed は種類を問わず必須。ストーリーズはフィードに出さないので false にする。
+			$metadata['instagram'] = array(
+				'type'              => 'story',
+				'shouldShareToFeed' => false,
+			);
 		} elseif ( 'instagram' === $service ) {
 			$metadata['instagram'] = array(
 				'type'              => 'post',
