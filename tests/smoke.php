@@ -259,9 +259,87 @@ $wctb_all = wp_insert_post( array( 'post_title' => 'All', 'post_status' => 'publ
 $wctb_check( 'タグ未指定ならタグのない投稿も送る', 2 === count( $wctb_calls ) );
 $wctb_check( '「キューに追加」を選ぶと下書きにしない', false === $wctb_settings['draft'] && ! isset( $wctb_calls[0]['input']['saveToDraft'] ) );
 
+// カテゴリー。親を指定し、子と孫、無関係のカテゴリーで確かめる。
+$wctb_term = static function ( $name, $parent = 0 ) {
+	$term = wp_insert_term( $name, 'category', array( 'parent' => $parent ) );
+
+	return is_wp_error( $term ) ? (int) $term->get_error_data() : (int) $term['term_id'];
+};
+
+$wctb_cat_parent = $wctb_term( 'wctb-smoke-parent' );
+$wctb_cat_child  = $wctb_term( 'wctb-smoke-child', $wctb_cat_parent );
+$wctb_cat_grand  = $wctb_term( 'wctb-smoke-grandchild', $wctb_cat_child );
+$wctb_cat_other  = $wctb_term( 'wctb-smoke-other' );
+
+$wctb_settings = ( new WCTB_Settings() )->sanitize(
+	array(
+		'form'         => '1',
+		'delivery'     => 'queue',
+		'tags_input'   => '',
+		'categories'   => array( (string) $wctb_cat_parent, (string) $wctb_cat_parent, '999999999' ),
+		'category_add' => '0',
+	)
+);
+update_option( WCTB_Options::OPTION, $wctb_settings );
+$wctb_check( '存在するカテゴリーだけが重複なく保存される', array( $wctb_cat_parent ) === $wctb_settings['categories'] );
+$wctb_check( 'カテゴリーを含む保存用の値をもう一度通しても変わらない', ( new WCTB_Settings() )->sanitize( $wctb_settings ) === $wctb_settings );
+
+$wctb_added = ( new WCTB_Settings() )->sanitize(
+	array(
+		'form'         => '1',
+		'categories'   => array( (string) $wctb_cat_parent ),
+		'category_add' => (string) $wctb_cat_other,
+	)
+);
+$wctb_check( 'プルダウンで選んだまま保存したカテゴリーも足される', array( $wctb_cat_parent, $wctb_cat_other ) === $wctb_added['categories'] );
+
+$wctb_cat_posts = array();
+$wctb_publish   = static function ( $title, array $categories, array $tags = array() ) use ( &$wctb_cat_posts, &$wctb_calls ) {
+	$wctb_calls       = array();
+	$wctb_cat_posts[] = wp_insert_post(
+		array(
+			'post_title'    => $title,
+			'post_status'   => 'publish',
+			'post_type'     => 'post',
+			'post_category' => $categories,
+			'tags_input'    => $tags,
+		)
+	);
+
+	return count( $wctb_calls );
+};
+
+$wctb_check( '指定したカテゴリーの投稿は送る', 2 === $wctb_publish( 'In parent', array( $wctb_cat_parent ) ) );
+$wctb_check( '下位のカテゴリーの投稿も送る', 2 === $wctb_publish( 'In child', array( $wctb_cat_child ) ) );
+$wctb_check( '孫のカテゴリーの投稿も送る', 2 === $wctb_publish( 'In grandchild', array( $wctb_cat_grand ) ) );
+$wctb_check( '指定のカテゴリーにない投稿は送らない', 0 === $wctb_publish( 'In other', array( $wctb_cat_other ) ) );
+$wctb_check( '複数のカテゴリーのうち 1 つが当てはまれば送る', 2 === $wctb_publish( 'In both', array( $wctb_cat_other, $wctb_cat_grand ) ) );
+
+// 下位のカテゴリーを指定したときは、上位のカテゴリーの投稿を送らない。
+$wctb_settings = ( new WCTB_Settings() )->sanitize( array( 'form' => '1', 'delivery' => 'queue', 'categories' => array( (string) $wctb_cat_child ) ) );
+update_option( WCTB_Options::OPTION, $wctb_settings );
+$wctb_check( '下位を指定したときは上位のカテゴリーの投稿を送らない', 0 === $wctb_publish( 'Parent only', array( $wctb_cat_parent ) ) );
+
+// タグとカテゴリーの両方を指定する。
+$wctb_settings = ( new WCTB_Settings() )->sanitize(
+	array(
+		'form'       => '1',
+		'delivery'   => 'queue',
+		'tags_input' => 'wctb-smoke',
+		'categories' => array( (string) $wctb_cat_parent ),
+	)
+);
+update_option( WCTB_Options::OPTION, $wctb_settings );
+$wctb_check( 'タグとカテゴリーの両方を満たす投稿は送る', 2 === $wctb_publish( 'Tag and category', array( $wctb_cat_child ), array( 'wctb-smoke' ) ) );
+$wctb_check( 'カテゴリーだけを満たす投稿は送らない', 0 === $wctb_publish( 'Category only', array( $wctb_cat_child ) ) );
+$wctb_check( 'タグだけを満たす投稿は送らない', 0 === $wctb_publish( 'Tag only', array( $wctb_cat_other ), array( 'wctb-smoke' ) ) );
+
 // 後始末。
-foreach ( array( $wctb_post, $wctb_no_tag, $wctb_page, $wctb_future, $wctb_all ) as $wctb_id ) {
+foreach ( array_merge( array( $wctb_post, $wctb_no_tag, $wctb_page, $wctb_future, $wctb_all ), $wctb_cat_posts ) as $wctb_id ) {
 	wp_delete_post( $wctb_id, true );
+}
+foreach ( array( $wctb_cat_grand, $wctb_cat_child, $wctb_cat_parent, $wctb_cat_other ) as $wctb_id ) {
+	wp_delete_term( $wctb_id, 'category' );
 }
 wp_delete_term( $wctb_tag, 'post_tag' );
 delete_option( WCTB_Options::OPTION );

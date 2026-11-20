@@ -23,7 +23,7 @@ class WCTB_Options {
 	/**
 	 * 保存済みの設定を、既定値で補って返す。
 	 *
-	 * @return array{api_key:string,channels:string[],tags:int[],draft:bool,title_image:string[]}
+	 * @return array{api_key:string,channels:string[],tags:int[],categories:int[],draft:bool,title_image:string[]}
 	 */
 	public static function get() {
 		$saved = get_option( self::OPTION, array() );
@@ -33,6 +33,8 @@ class WCTB_Options {
 			'api_key'     => isset( $saved['api_key'] ) ? (string) $saved['api_key'] : '',
 			'channels'    => isset( $saved['channels'] ) ? array_values( array_map( 'strval', (array) $saved['channels'] ) ) : array(),
 			'tags'        => isset( $saved['tags'] ) ? array_values( array_map( 'intval', (array) $saved['tags'] ) ) : array(),
+			// 送る対象にするカテゴリーの ID。下位のカテゴリーは送信時に含める。
+			'categories'  => isset( $saved['categories'] ) ? array_values( array_map( 'intval', (array) $saved['categories'] ) ) : array(),
 			// 既定は下書き。確認なしに SNS へ公開されないようにする。
 			'draft'       => isset( $saved['draft'] ) ? (bool) $saved['draft'] : true,
 			// タイトル入りの縦長画像を送るチャンネルの ID。

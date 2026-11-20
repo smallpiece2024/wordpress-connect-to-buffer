@@ -84,6 +84,7 @@ class WCTB_Settings {
 				'api_key'     => isset( $input['api_key'] ) ? sanitize_text_field( $input['api_key'] ) : '',
 				'channels'    => isset( $input['channels'] ) ? array_values( array_map( 'sanitize_text_field', (array) $input['channels'] ) ) : array(),
 				'tags'        => isset( $input['tags'] ) ? array_values( array_filter( array_map( 'absint', (array) $input['tags'] ) ) ) : array(),
+				'categories'  => isset( $input['categories'] ) ? array_values( array_filter( array_map( 'absint', (array) $input['categories'] ) ) ) : array(),
 				'draft'       => isset( $input['draft'] ) ? (bool) $input['draft'] : true,
 				'title_image' => isset( $input['title_image'] ) ? array_values( array_map( 'sanitize_text_field', (array) $input['title_image'] ) ) : array(),
 			);
@@ -157,7 +158,43 @@ class WCTB_Settings {
 			);
 		}
 
+		// カテゴリー。一覧に足したものに加えて、プルダウンで選んだまま保存したものも足す。
+		$category_ids = isset( $input['categories'] ) ? (array) $input['categories'] : array();
+		if ( ! empty( $input['category_add'] ) ) {
+			$category_ids[] = $input['category_add'];
+		}
+
+		$new['categories'] = array();
+		foreach ( array_unique( array_filter( array_map( 'absint', $category_ids ) ) ) as $category_id ) {
+			if ( get_term( $category_id, 'category' ) instanceof WP_Term ) {
+				$new['categories'][] = $category_id;
+			}
+		}
+
 		return $new;
+	}
+
+	/**
+	 * カテゴリーの名前を、上位のカテゴリーから順に「 > 」でつないで返す。
+	 *
+	 * @param int $category_id カテゴリーの ID。
+	 * @return string カテゴリーがなければ空文字。
+	 */
+	private function category_label( $category_id ) {
+		$term = get_term( $category_id, 'category' );
+		if ( ! $term instanceof WP_Term ) {
+			return '';
+		}
+
+		$names = array( $term->name );
+		foreach ( get_ancestors( $term->term_id, 'category', 'taxonomy' ) as $ancestor_id ) {
+			$ancestor = get_term( $ancestor_id, 'category' );
+			if ( $ancestor instanceof WP_Term ) {
+				array_unshift( $names, $ancestor->name );
+			}
+		}
+
+		return implode( ' > ', $names );
 	}
 
 	/**
@@ -183,6 +220,12 @@ class WCTB_Settings {
 			if ( $term instanceof WP_Term ) {
 				$tag_names[] = $term->name;
 			}
+		}
+
+		// プルダウンで選んだカテゴリーを一覧に足すときの表示名。
+		$category_labels = array();
+		foreach ( get_terms( array( 'taxonomy' => 'category', 'hide_empty' => false, 'fields' => 'ids' ) ) as $category_id ) {
+			$category_labels[ (int) $category_id ] = $this->category_label( (int) $category_id );
 		}
 		?>
 		<div class="wrap">
@@ -324,10 +367,109 @@ class WCTB_Settings {
 							</p>
 						</td>
 					</tr>
+
+					<tr>
+						<th scope="row">
+							<label for="wctb-category-add"><?php esc_html_e( 'Categories', 'wordpress-connect-to-buffer' ); ?></label>
+						</th>
+						<td>
+							<ul id="wctb-categories" style="margin-top: 0;">
+								<?php foreach ( $settings['categories'] as $category_id ) : ?>
+									<?php if ( isset( $category_labels[ $category_id ] ) ) : ?>
+										<li>
+											<input type="hidden" name="<?php echo esc_attr( $name ); ?>[categories][]" value="<?php echo esc_attr( $category_id ); ?>" />
+											<span><?php echo esc_html( $category_labels[ $category_id ] ); ?></span>
+											<button type="button" class="button-link button-link-delete wctb-category-remove"><?php esc_html_e( 'Remove', 'wordpress-connect-to-buffer' ); ?></button>
+										</li>
+									<?php endif; ?>
+								<?php endforeach; ?>
+							</ul>
+							<?php
+							wp_dropdown_categories(
+								array(
+									'taxonomy'          => 'category',
+									'hierarchical'      => true,
+									'hide_empty'        => false,
+									'orderby'           => 'name',
+									'name'              => $name . '[category_add]',
+									'id'                => 'wctb-category-add',
+									'show_option_none'  => __( '— Select a category —', 'wordpress-connect-to-buffer' ),
+									'option_none_value' => '0',
+								)
+							);
+							?>
+							<button type="button" class="button" id="wctb-category-button"><?php esc_html_e( 'Add', 'wordpress-connect-to-buffer' ); ?></button>
+							<p class="description">
+								<?php esc_html_e( 'Choose a category and add it. Only posts in at least one of these categories are sent. A category also covers every category below it. Leave the list empty to send posts in any category. If tags are also set, a post must match both.', 'wordpress-connect-to-buffer' ); ?>
+							</p>
+						</td>
+					</tr>
 				</table>
 
 				<?php submit_button(); ?>
 			</form>
+
+			<script>
+			( function () {
+				var list   = document.getElementById( 'wctb-categories' );
+				var select = document.getElementById( 'wctb-category-add' );
+				var button = document.getElementById( 'wctb-category-button' );
+				var labels = <?php echo wp_json_encode( $category_labels, JSON_HEX_TAG | JSON_HEX_AMP ); ?>;
+				var field  = <?php echo wp_json_encode( $name . '[categories][]', JSON_HEX_TAG | JSON_HEX_AMP ); ?>;
+				var remove = <?php echo wp_json_encode( __( 'Remove', 'wordpress-connect-to-buffer' ), JSON_HEX_TAG | JSON_HEX_AMP ); ?>;
+
+				if ( ! list || ! select || ! button ) {
+					return;
+				}
+
+				button.addEventListener( 'click', function () {
+					var id = select.value;
+					var added, i, item, input, label, link;
+
+					if ( ! id || '0' === id ) {
+						return;
+					}
+
+					added = list.querySelectorAll( 'input' );
+					for ( i = 0; i < added.length; i++ ) {
+						if ( added[ i ].value === id ) {
+							select.value = '0';
+							return;
+						}
+					}
+
+					item  = document.createElement( 'li' );
+					input = document.createElement( 'input' );
+					label = document.createElement( 'span' );
+					link  = document.createElement( 'button' );
+
+					input.type  = 'hidden';
+					input.name  = field;
+					input.value = id;
+
+					label.textContent = labels[ id ] || id;
+
+					link.type        = 'button';
+					link.className   = 'button-link button-link-delete wctb-category-remove';
+					link.textContent = remove;
+
+					item.appendChild( input );
+					item.appendChild( document.createTextNode( ' ' ) );
+					item.appendChild( label );
+					item.appendChild( document.createTextNode( ' ' ) );
+					item.appendChild( link );
+					list.appendChild( item );
+
+					select.value = '0';
+				} );
+
+				list.addEventListener( 'click', function ( event ) {
+					if ( event.target.classList.contains( 'wctb-category-remove' ) ) {
+						event.target.parentNode.parentNode.removeChild( event.target.parentNode );
+					}
+				} );
+			}() );
+			</script>
 
 			<?php $this->render_log( is_array( $channels ) ? $channels : array() ); ?>
 		</div>

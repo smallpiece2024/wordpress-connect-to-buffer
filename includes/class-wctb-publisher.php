@@ -56,6 +56,11 @@ class WCTB_Publisher {
 			return;
 		}
 
+		// タグとカテゴリーの両方を指定したときは、両方の条件を満たす投稿だけを送る。
+		if ( $settings['categories'] && ! $this->in_categories( $post, $settings['categories'] ) ) {
+			return;
+		}
+
 		/**
 		 * この投稿を Buffer に送るかどうか。
 		 *
@@ -113,6 +118,28 @@ class WCTB_Publisher {
 		}
 
 		update_post_meta( $post_id, WCTB_Options::SENT_META, $sent );
+	}
+
+	/**
+	 * 投稿が、指定のカテゴリーかその下位のカテゴリーのいずれかに入っているか。
+	 *
+	 * 下位のカテゴリーは送信のたびに調べるので、設定のあとで足したものも対象になる。
+	 *
+	 * @param WP_Post $post       投稿。
+	 * @param int[]   $categories カテゴリーの ID。
+	 * @return bool
+	 */
+	private function in_categories( $post, array $categories ) {
+		$ids = $categories;
+
+		foreach ( $categories as $category_id ) {
+			$children = get_term_children( $category_id, 'category' );
+			if ( is_array( $children ) ) {
+				$ids = array_merge( $ids, $children );
+			}
+		}
+
+		return has_term( array_values( array_unique( array_map( 'intval', $ids ) ) ), 'category', $post );
 	}
 
 	/**
