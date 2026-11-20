@@ -32,6 +32,11 @@ class WCTB_Image {
 	// 試す文字の大きさ（pt）。大きいものから順に、MAX_LINES 行に収まるものを使う。
 	const FONT_SIZES = array( 64, 58, 52, 46, 40 );
 
+	// タイトルの上に入れる固定の文面の、文字の大きさ（pt）、最大行数、タイトルとの間隔（px）。
+	const LEAD_SIZE      = 34;
+	const LEAD_MAX_LINES = 2;
+	const LEAD_GAP       = 36;
+
 	// 行頭に置かない文字。前の文字にくっつける。
 	const NO_LINE_START = '、。，．！？!?）)」』】〕〉》・…ー々ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮ';
 
@@ -106,8 +111,9 @@ class WCTB_Image {
 			return '';
 		}
 
+		$lead = WCTB_Options::lead( $post );
 		$font = self::font_path();
-		$hash = substr( md5( implode( '|', array( $title, $source, (string) filemtime( $source ), $font, WCTB_VERSION ) ) ), 0, 12 );
+		$hash = substr( md5( implode( '|', array( $lead, $title, $source, (string) filemtime( $source ), $font, WCTB_VERSION ) ) ), 0, 12 );
 		$name = 'post-' . (int) $post->ID . '-' . $hash . '.jpg';
 		$path = $dir . '/' . $name;
 		$url  = trailingslashit( $uploads['baseurl'] ) . self::DIR . '/' . $name;
@@ -127,8 +133,8 @@ class WCTB_Image {
 		$canvas = self::crop( $image );
 		imagedestroy( $image );
 
-		if ( '' !== $title ) {
-			self::draw_title( $canvas, $title, $font );
+		if ( '' !== $title || '' !== $lead ) {
+			self::draw_title( $canvas, $title, $font, $lead );
 		}
 
 		// タイトルや画像を変えて作り直したときに、古いファイルを残さない。
@@ -199,12 +205,19 @@ class WCTB_Image {
 	/**
 	 * 画像の中央に半透明の帯を敷き、その上にタイトルを白で描く。
 	 *
+	 * 固定の文面があれば、タイトルの上に小さめの文字で描く。
+	 *
 	 * @param resource|GdImage $canvas 描き込む画像。
 	 * @param string           $title  タイトル。
 	 * @param string           $font   フォントファイルのパス。
+	 * @param string           $lead   タイトルの上に入れる固定の文面。
 	 */
-	private static function draw_title( $canvas, $title, $font ) {
+	private static function draw_title( $canvas, $title, $font, $lead = '' ) {
 		$max_width = self::WIDTH - 2 * self::MARGIN;
+
+		$lead_lines = '' === $lead ? array() : self::wrap( self::tokenize( $lead ), self::LEAD_SIZE, $font, $max_width );
+		$lead_lines = self::limit_lines( $lead_lines, self::LEAD_MAX_LINES, self::LEAD_SIZE, $font, $max_width );
+
 		$tokens    = self::tokenize( $title );
 		$size      = 0;
 		$lines     = array();
@@ -217,14 +230,7 @@ class WCTB_Image {
 		}
 
 		if ( count( $lines ) > self::MAX_LINES ) {
-			$lines = array_slice( $lines, 0, self::MAX_LINES );
-			$last  = $lines[ self::MAX_LINES - 1 ];
-
-			while ( '' !== $last && self::text_width( $last . '…', $size, $font ) > $max_width ) {
-				$last = (string) preg_replace( '/.$/us', '', $last );
-			}
-
-			$lines[ self::MAX_LINES - 1 ] = $last . '…';
+			$lines = self::limit_lines( $lines, self::MAX_LINES, $size, $font, $max_width );
 		} elseif ( count( $lines ) > 1 ) {
 			// 最後の行だけ短くならないよう、同じ行数に収まるいちばん狭い幅で折り返し直す。
 			$count = count( $lines );
@@ -244,11 +250,11 @@ class WCTB_Image {
 			}
 		}
 
-		// GD は文字の大きさを pt（96dpi）で受け取る。
-		$em          = $size * 96 / 72;
-		$line_height = (int) round( $em * 1.45 );
-		$text_height = $line_height * count( $lines );
-		$top         = (int) round( ( self::HEIGHT - $text_height ) / 2 );
+		$lead_height  = self::line_height( self::LEAD_SIZE ) * count( $lead_lines );
+		$title_height = self::line_height( $size ) * count( $lines );
+		$gap          = $lead_lines && $lines ? self::LEAD_GAP : 0;
+		$text_height  = $lead_height + $gap + $title_height;
+		$top          = (int) round( ( self::HEIGHT - $text_height ) / 2 );
 
 		imagealphablending( $canvas, true );
 		imagefilledrectangle(
@@ -260,9 +266,35 @@ class WCTB_Image {
 			imagecolorallocatealpha( $canvas, 0, 0, 0, 50 )
 		);
 
-		$white = imagecolorallocate( $canvas, 255, 255, 255 );
+		self::draw_lines( $canvas, $lead_lines, self::LEAD_SIZE, $font, $top );
+		self::draw_lines( $canvas, $lines, $size, $font, $top + $lead_height + $gap );
+	}
 
-		foreach ( $lines as $index => $line ) {
+	/**
+	 * 行の高さ（px）。GD は文字の大きさを pt（96dpi）で受け取る。
+	 *
+	 * @param int $size 文字の大きさ（pt）。
+	 * @return int
+	 */
+	private static function line_height( $size ) {
+		return (int) round( $size * 96 / 72 * 1.45 );
+	}
+
+	/**
+	 * 行を、左右の中央に白で描く。
+	 *
+	 * @param resource|GdImage $canvas 描き込む画像。
+	 * @param string[]         $lines  行。
+	 * @param int              $size   文字の大きさ（pt）。
+	 * @param string           $font   フォントファイルのパス。
+	 * @param int              $top    最初の行の上端（px）。
+	 */
+	private static function draw_lines( $canvas, array $lines, $size, $font, $top ) {
+		$em          = $size * 96 / 72;
+		$line_height = self::line_height( $size );
+		$white       = imagecolorallocate( $canvas, 255, 255, 255 );
+
+		foreach ( array_values( $lines ) as $index => $line ) {
 			$box = imagettfbbox( $size, 0, $font, $line );
 			$x   = (int) round( ( self::WIDTH - ( $box[2] - $box[0] ) ) / 2 - $box[0] );
 
@@ -271,6 +303,33 @@ class WCTB_Image {
 
 			imagettftext( $canvas, $size, 0, $x, $y, $white, $font, $line );
 		}
+	}
+
+	/**
+	 * 行数が上限を超えていれば、超える分を捨てて、最後の行を「…」で終える。
+	 *
+	 * @param string[] $lines     行。
+	 * @param int      $max_lines 行数の上限。
+	 * @param int      $size      文字の大きさ（pt）。
+	 * @param string   $font      フォントファイルのパス。
+	 * @param int      $max_width 行の最大幅（px）。
+	 * @return string[]
+	 */
+	private static function limit_lines( array $lines, $max_lines, $size, $font, $max_width ) {
+		if ( count( $lines ) <= $max_lines ) {
+			return $lines;
+		}
+
+		$lines = array_slice( $lines, 0, $max_lines );
+		$last  = $lines[ $max_lines - 1 ];
+
+		while ( '' !== $last && self::text_width( $last . '…', $size, $font ) > $max_width ) {
+			$last = (string) preg_replace( '/.$/us', '', $last );
+		}
+
+		$lines[ $max_lines - 1 ] = $last . '…';
+
+		return $lines;
 	}
 
 	/**

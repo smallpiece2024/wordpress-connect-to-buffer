@@ -264,14 +264,14 @@ class WCTB_Publisher {
 	}
 
 	/**
-	 * 本文（タイトルと URL）を作る。
+	 * 本文（固定の文面、タイトル、URL）を作る。固定の文面は、設定されているときだけ付ける。
 	 *
 	 * @param WP_Post $post 投稿。
 	 * @return string
 	 */
 	private function build_text( WP_Post $post ) {
 		$title = wp_strip_all_tags( html_entity_decode( $post->post_title, ENT_QUOTES, 'UTF-8' ) );
-		$text  = trim( $title . "\n" . get_permalink( $post ) );
+		$text  = trim( WCTB_Options::lead( $post ) . "\n" . $title . "\n" . get_permalink( $post ) );
 
 		/**
 		 * Buffer に送る本文。

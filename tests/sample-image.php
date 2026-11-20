@@ -24,6 +24,20 @@ $wctb_titles = array(
 	'long'   => 'はじめての一人旅で訪れた北海道の小さな港町で、地元の人に教えてもらった朝市の海鮮丼と、夕暮れの灯台までの散歩道がとても良かったので、行き方と費用と持ち物をすべてまとめて詳しく紹介します（保存版）',
 );
 
+// タイトルの上に入れる固定の文面。long には、2 行に収まらない長さのものを使う。
+$wctb_leads = array(
+	'short'  => '',
+	'middle' => 'サンプルサイトに新しい記事を公開しました',
+	'long'   => 'サンプルサイトという名前のとても長い名前のウェブサイトに、新しい記事を公開しましたので、ぜひプロフィールのリンクからご覧ください',
+);
+$wctb_lead  = '';
+add_filter(
+	'wctb_lead_text',
+	static function () use ( &$wctb_lead ) {
+		return $wctb_lead;
+	}
+);
+
 $wctb_uploads = wp_upload_dir();
 $wctb_source  = trailingslashit( $wctb_uploads['path'] ) . 'wctb-sample-source.jpg';
 
@@ -65,6 +79,7 @@ foreach ( $wctb_titles as $wctb_key => $wctb_title ) {
 		)
 	);
 	set_post_thumbnail( $wctb_post, $wctb_attachment );
+	$wctb_lead = $wctb_leads[ $wctb_key ];
 
 	$wctb_url = WCTB_Image::generate( get_post( $wctb_post ) );
 	if ( '' === $wctb_url ) {

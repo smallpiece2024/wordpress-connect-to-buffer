@@ -184,9 +184,12 @@ $wctb_settings = ( new WCTB_Settings() )->sanitize(
 		'channels'        => array( 'ch1', 'ch2' ),
 		'title_image'     => array( 'ch1' ),
 		'tags_input'      => 'wctb-smoke',
+		'lead'            => '  サンプルサイトに新しい記事を公開しました ',
 	)
 );
 update_option( WCTB_Options::OPTION, $wctb_settings );
+$wctb_check( '固定の文面が前後の空白を除いて保存される', 'サンプルサイトに新しい記事を公開しました' === $wctb_settings['lead'] );
+$wctb_check( '固定の文面を含む保存用の値をもう一度通しても変わらない', ( new WCTB_Settings() )->sanitize( $wctb_settings ) === $wctb_settings );
 $wctb_check( 'タイトル入り画像を送るチャンネルが保存される', array( 'ch1' ) === $wctb_settings['title_image'] );
 
 $wctb_kept = ( new WCTB_Settings() )->sanitize( array( 'form' => '1', 'tags_input' => 'wctb-smoke' ) );
@@ -212,9 +215,25 @@ $wctb_check( 'タイトル入り画像を送る Instagram にはストーリー�
 $wctb_check( 'タイトル入り画像は 1080×1920 になる', 1080 === $wctb_title_size[0] && 1920 === $wctb_title_size[1] );
 $wctb_check( '指定のないチャンネルにはアイキャッチ画像をそのまま送る', 'wctb-smoke-source.jpg' === basename( (string) ( $wctb_calls[1]['input']['assets'][0]['image']['url'] ?? '' ) ) );
 $wctb_check( '同じ画像とタイトルなら作り直さない', WCTB_Image::generate( get_post( $wctb_titled ) ) === $wctb_title_url );
+$wctb_check(
+	'固定の文面があれば、本文の 1 行目に入れる',
+	"サンプルサイトに新しい記事を公開しました\n日本語のタイトルを画像に描き込む、折り返しの確認\n" . get_permalink( $wctb_titled ) === ( $wctb_calls[1]['input']['text'] ?? null )
+);
+
+// 固定の文面を変えると、画像を作り直す。
+$wctb_other_lead = static function () {
+	return '別の文面';
+};
+add_filter( 'wctb_lead_text', $wctb_other_lead );
+$wctb_relead_url  = WCTB_Image::generate( get_post( $wctb_titled ) );
+$wctb_title_glob  = trailingslashit( $wctb_uploads['basedir'] ) . WCTB_Image::DIR . '/post-' . $wctb_titled . '-*.jpg';
+$wctb_relead_size = getimagesize( trailingslashit( $wctb_uploads['basedir'] ) . WCTB_Image::DIR . '/' . basename( $wctb_relead_url ) );
+remove_filter( 'wctb_lead_text', $wctb_other_lead );
+$wctb_check( '固定の文面を変えると、画像を作り直して古いものを消す', '' !== $wctb_relead_url && $wctb_relead_url !== $wctb_title_url && ! file_exists( $wctb_title_path ) && 1 === count( (array) glob( $wctb_title_glob ) ) );
+$wctb_check( '固定の文面を入れた画像も 1080×1920 になる', 1080 === $wctb_relead_size[0] && 1920 === $wctb_relead_size[1] );
 
 wp_delete_post( $wctb_titled, true );
-$wctb_check( '投稿を消すとタイトル入り画像も消える', ! file_exists( $wctb_title_path ) );
+$wctb_check( '投稿を消すとタイトル入り画像も消える', array() === (array) glob( $wctb_title_glob ) );
 
 wp_delete_attachment( $wctb_attachment, true );
 remove_filter( 'upload_dir', $wctb_https );

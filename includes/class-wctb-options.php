@@ -24,7 +24,7 @@ class WCTB_Options {
 	/**
 	 * 保存済みの設定を、既定値で補って返す。
 	 *
-	 * @return array{api_key:string,channels:string[],tags:int[],categories:int[],draft:bool,title_image:string[]}
+	 * @return array{api_key:string,channels:string[],tags:int[],categories:int[],draft:bool,title_image:string[],lead:string}
 	 */
 	public static function get() {
 		$saved = get_option( self::OPTION, array() );
@@ -40,7 +40,29 @@ class WCTB_Options {
 			'draft'       => isset( $saved['draft'] ) ? (bool) $saved['draft'] : true,
 			// タイトル入りの縦長画像を送るチャンネルの ID。
 			'title_image' => isset( $saved['title_image'] ) ? array_values( array_map( 'strval', (array) $saved['title_image'] ) ) : array(),
+			// タイトルの前に付ける固定の文面。本文と、タイトル入りの縦長画像の両方に入る。
+			'lead'        => isset( $saved['lead'] ) ? (string) $saved['lead'] : '',
 		);
+	}
+
+	/**
+	 * タイトルの前に付ける文面を返す。空文字なら何も付けない。
+	 *
+	 * @param WP_Post $post 投稿。
+	 * @return string
+	 */
+	public static function lead( WP_Post $post ) {
+		$settings = self::get();
+
+		/**
+		 * タイトルの前に付ける文面。空文字なら何も付けない。
+		 *
+		 * @param string  $lead 設定画面で保存した文面。
+		 * @param WP_Post $post 投稿。
+		 */
+		$lead = (string) apply_filters( 'wctb_lead_text', $settings['lead'], $post );
+
+		return trim( (string) preg_replace( '/\s+/u', ' ', $lead ) );
 	}
 
 	/**

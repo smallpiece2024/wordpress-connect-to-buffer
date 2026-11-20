@@ -91,6 +91,7 @@ class WCTB_Settings {
 				'categories'  => isset( $input['categories'] ) ? array_values( array_filter( array_map( 'absint', (array) $input['categories'] ) ) ) : array(),
 				'draft'       => isset( $input['draft'] ) ? (bool) $input['draft'] : true,
 				'title_image' => isset( $input['title_image'] ) ? array_values( array_map( 'sanitize_text_field', (array) $input['title_image'] ) ) : array(),
+				'lead'        => isset( $input['lead'] ) ? sanitize_text_field( $input['lead'] ) : '',
 			);
 		}
 
@@ -124,6 +125,9 @@ class WCTB_Settings {
 			$title_image        = isset( $input['title_image'] ) ? (array) $input['title_image'] : array();
 			$new['title_image'] = array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $title_image ) ) ) );
 		}
+
+		// タイトルの前に付ける固定の文面。
+		$new['lead'] = isset( $input['lead'] ) ? sanitize_text_field( $input['lead'] ) : '';
 
 		// タグ。名前かスラッグで受け取り、ターム ID で保存する。
 		$names   = isset( $input['tags_input'] ) ? preg_split( '/[,、]/u', (string) $input['tags_input'] ) : array();
@@ -527,6 +531,20 @@ class WCTB_Settings {
 							</fieldset>
 							<p class="description">
 								<?php esc_html_e( 'A draft is not published until you schedule it in Buffer. A queued post is published automatically at the next slot of your posting schedule.', 'wordpress-connect-to-buffer' ); ?>
+							</p>
+						</td>
+					</tr>
+
+					<tr>
+						<th scope="row">
+							<label for="wctb-lead"><?php esc_html_e( 'Text before the title', 'wordpress-connect-to-buffer' ); ?></label>
+						</th>
+						<td>
+							<input type="text" id="wctb-lead" class="large-text"
+								name="<?php echo esc_attr( $name ); ?>[lead]"
+								value="<?php echo esc_attr( $settings['lead'] ); ?>" />
+							<p class="description">
+								<?php esc_html_e( 'A fixed text that tells readers what the title is, such as "New post on My Site". It is placed on the line before the title in the text sent to Buffer, and above the title on the vertical image. Leave empty to send the title alone.', 'wordpress-connect-to-buffer' ); ?>
 							</p>
 						</td>
 					</tr>
