@@ -179,6 +179,31 @@ class WCTB_Settings {
 	}
 
 	/**
+	 * 設定画面のタブ。キーは URL の tab に入る値。
+	 *
+	 * @return array<string,string>
+	 */
+	private function tabs() {
+		return array(
+			'settings' => __( 'Settings', 'wordpress-connect-to-buffer' ),
+			'test'     => __( 'Test', 'wordpress-connect-to-buffer' ),
+			'log'      => __( 'Recent activity', 'wordpress-connect-to-buffer' ),
+		);
+	}
+
+	/**
+	 * タブの URL を返す。
+	 *
+	 * @param string $tab タブのキー。
+	 * @return string
+	 */
+	private function tab_url( $tab ) {
+		$url = admin_url( 'options-general.php?page=' . self::PAGE );
+
+		return 'settings' === $tab ? $url : add_query_arg( 'tab', $tab, $url );
+	}
+
+	/**
 	 * テスト送信を実行し、結果を設定画面に表示するために残して、設定画面へ戻る。
 	 */
 	public function handle_test_send() {
@@ -203,7 +228,7 @@ class WCTB_Settings {
 				'type'    => $failed ? 'error' : 'success',
 				'message' => sprintf(
 					/* translators: 1: post title, 2: number of channels that succeeded, 3: number of channels that failed. */
-					__( 'Test of "%1$s": saved as a draft in Buffer for %2$d channel(s), failed for %3$d. Details are in "Recent activity" below.', 'wordpress-connect-to-buffer' ),
+					__( 'Test of "%1$s": saved as a draft in Buffer for %2$d channel(s), failed for %3$d.', 'wordpress-connect-to-buffer' ),
 					get_the_title( $post ),
 					count( $result ) - $failed,
 					$failed
@@ -213,7 +238,8 @@ class WCTB_Settings {
 
 		set_transient( self::TEST_NOTICE . get_current_user_id(), $notice, MINUTE_IN_SECONDS );
 
-		wp_safe_redirect( admin_url( 'options-general.php?page=' . self::PAGE ) );
+		// 送った結果はログのタブで見せる。送らなかったときは、テストのタブに戻って選び直せるようにする。
+		wp_safe_redirect( $this->tab_url( is_wp_error( $result ) ? 'test' : 'log' ) );
 		exit;
 	}
 
@@ -260,7 +286,6 @@ class WCTB_Settings {
 
 		$publisher = new WCTB_Publisher();
 		?>
-		<h2><?php esc_html_e( 'Test', 'wordpress-connect-to-buffer' ); ?></h2>
 		<p>
 			<?php esc_html_e( 'Sends a published post to Buffer without publishing anything new. A test is always saved as a draft in Buffer, even when "Add it to the queue" is selected, so nothing reaches your social accounts. It uses the saved settings, including tags and categories, and it sends to every selected channel even if the post was sent before. Delete the drafts in Buffer afterwards.', 'wordpress-connect-to-buffer' ); ?>
 		</p>
@@ -333,6 +358,10 @@ class WCTB_Settings {
 		$channels = $has_key ? WCTB_Options::channels() : array();
 		$name     = WCTB_Options::OPTION;
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- 表示するタブを選ぶだけで、何も変更しない。
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : '';
+		$tab = isset( $this->tabs()[ $tab ] ) ? $tab : 'settings';
+
 		$tag_names = array();
 		foreach ( $settings['tags'] as $tag_id ) {
 			$term = get_term( $tag_id, 'post_tag' );
@@ -360,6 +389,25 @@ class WCTB_Settings {
 				</div>
 			<?php endif; ?>
 
+			<nav class="nav-tab-wrapper" style="margin-bottom: 1em;">
+				<?php foreach ( $this->tabs() as $key => $label ) : ?>
+					<a href="<?php echo esc_url( $this->tab_url( $key ) ); ?>"
+						class="nav-tab<?php echo $key === $tab ? ' nav-tab-active' : ''; ?>"
+						<?php echo $key === $tab ? 'aria-current="page"' : ''; ?>>
+						<?php echo esc_html( $label ); ?>
+					</a>
+				<?php endforeach; ?>
+			</nav>
+
+			<?php
+			if ( 'test' === $tab ) {
+				$this->render_test( $settings, $has_key );
+			} elseif ( 'log' === $tab ) {
+				$this->render_log( is_array( $channels ) ? $channels : array() );
+			}
+			?>
+
+			<?php if ( 'settings' === $tab ) : ?>
 			<form method="post" action="options.php">
 				<?php settings_fields( self::GROUP ); ?>
 				<input type="hidden" name="<?php echo esc_attr( $name ); ?>[form]" value="1" />
@@ -599,10 +647,7 @@ class WCTB_Settings {
 				} );
 			}() );
 			</script>
-
-			<?php $this->render_test( $settings, $has_key ); ?>
-
-			<?php $this->render_log( is_array( $channels ) ? $channels : array() ); ?>
+			<?php endif; ?>
 		</div>
 		<?php
 	}
@@ -615,6 +660,8 @@ class WCTB_Settings {
 	private function render_log( array $channels ) {
 		$log = WCTB_Options::get_log();
 		if ( ! $log ) {
+			echo '<p>' . esc_html__( 'Nothing has been sent yet.', 'wordpress-connect-to-buffer' ) . '</p>';
+
 			return;
 		}
 
@@ -623,7 +670,6 @@ class WCTB_Settings {
 			$names[ $channel['id'] ] = $channel['name'] . ' (' . $channel['service'] . ')';
 		}
 		?>
-		<h2><?php esc_html_e( 'Recent activity', 'wordpress-connect-to-buffer' ); ?></h2>
 		<table class="widefat striped">
 			<thead>
 				<tr>

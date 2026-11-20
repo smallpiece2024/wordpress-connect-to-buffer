@@ -383,14 +383,35 @@ $wctb_notice = get_transient( WCTB_Settings::TEST_NOTICE . '1' );
 $wctb_check( '設定画面からのテスト送信で 2 つのチャンネルへ送る', 2 === count( $wctb_calls ) );
 $wctb_check( '設定画面に出す結果が残る', is_array( $wctb_notice ) && 'error' === $wctb_notice['type'] && false !== strpos( $wctb_notice['message'], 'for 1 channel(s), failed for 1' ) );
 
-ob_start();
-( new WCTB_Settings() )->render();
-$wctb_html = ob_get_clean();
-$wctb_check( '設定画面に結果とテスト送信の欄が出る', false !== strpos( $wctb_html, 'notice notice-error' ) && false !== strpos( $wctb_html, 'name="wctb_test_post"' ) && false !== strpos( $wctb_html, 'Tag only — will not be sent: the post is in none of the categories' ) );
-$wctb_check( '結果は 1 回だけ表示する', false === get_transient( WCTB_Settings::TEST_NOTICE . '1' ) );
-$wctb_check( 'ログにテスト送信と表示する', false !== strpos( $wctb_html, 'Test: Saved as draft' ) && false !== strpos( $wctb_html, 'Test: Failed: mock failure' ) );
+// タブごとの表示。
+$wctb_render = static function ( $tab ) {
+	if ( '' === $tab ) {
+		unset( $_GET['tab'] );
+	} else {
+		$_GET['tab'] = $tab;
+	}
 
-unset( $_POST['wctb_test_post'], $_REQUEST['_wpnonce'] );
+	ob_start();
+	( new WCTB_Settings() )->render();
+
+	return ob_get_clean();
+};
+
+$wctb_html = $wctb_render( 'log' );
+$wctb_check( 'ログのタブに、テスト送信の結果とログが出る', false !== strpos( $wctb_html, 'notice notice-error' ) && false !== strpos( $wctb_html, 'Test: Saved as draft' ) && false !== strpos( $wctb_html, 'Test: Failed: mock failure' ) );
+$wctb_check( 'ログのタブに、設定とテスト送信の欄は出ない', false === strpos( $wctb_html, 'id="wctb-tags"' ) && false === strpos( $wctb_html, 'name="wctb_test_post"' ) );
+$wctb_check( '結果は 1 回だけ表示する', false === get_transient( WCTB_Settings::TEST_NOTICE . '1' ) );
+
+$wctb_html = $wctb_render( 'test' );
+$wctb_check( 'テストのタブに、投稿の一覧と判定が出る', false !== strpos( $wctb_html, 'name="wctb_test_post"' ) && false !== strpos( $wctb_html, 'Tag only — will not be sent: the post is in none of the categories' ) );
+$wctb_check( 'テストのタブに、設定とログは出ない', false === strpos( $wctb_html, 'id="wctb-tags"' ) && false === strpos( $wctb_html, 'Test: Saved as draft' ) );
+
+$wctb_html = $wctb_render( '' );
+$wctb_check( 'タブの指定がなければ設定のタブを出す', false !== strpos( $wctb_html, 'id="wctb-tags"' ) && false !== strpos( $wctb_html, "id='wctb-category-add'" ) && false === strpos( $wctb_html, 'name="wctb_test_post"' ) && false === strpos( $wctb_html, 'Test: Saved as draft' ) );
+$wctb_check( '知らないタブの指定は設定のタブにする', $wctb_render( 'no-such-tab' ) === $wctb_html );
+$wctb_check( '3 つのタブへのリンクが出る', 3 === preg_match_all( '/class="nav-tab( nav-tab-active)?"/', $wctb_html ) && 1 === substr_count( $wctb_html, 'nav-tab-active' ) && false !== strpos( $wctb_html, 'page=wctb&#038;tab=test' ) && false !== strpos( $wctb_html, 'page=wctb&#038;tab=log' ) );
+
+unset( $_GET['tab'], $_POST['wctb_test_post'], $_REQUEST['_wpnonce'] );
 wp_set_current_user( 0 );
 
 // 後始末。
